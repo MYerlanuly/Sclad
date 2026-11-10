@@ -602,7 +602,7 @@ def register(app):
                 (first[1], first[0], task_id),
             )
         db.commit()
-        desc = f"Отмечено выполненным задание #{task_id}: «{(task["title"] or '')[:50]}»"
+        desc = f"Отмечено выполненным задание #{task_id}: «{(task['title'] or '')[:50]}»"
         if comment:
             desc += f". Что сделано: {comment[:100]}"
         log_operation("complete", "shift_task", task_id, desc)

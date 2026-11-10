@@ -4,7 +4,7 @@
 склад, установка на технику и демонтаж, техобслуживание с печатными актами, задания на смену,
 журнал смены инженеров, журнал операций, отчёты, импорт и экспорт, резервные копии базы.
 
-**Технологии:** Python 3.13+, Flask, SQLite, Jinja2, Tailwind, Chart.js. В продакшене: gunicorn за nginx.
+**Технологии:** Python 3.11+ (на сервере Debian 12 — 3.11), Flask, SQLite, Jinja2, Tailwind, Chart.js. В продакшене: gunicorn за nginx.
 
 ## Быстрый старт (Windows, для разработки и проверки)
 
@@ -132,7 +132,9 @@ python tests/load_test.py --users 20 --seconds 30
 ## Развёртывание и обновление на сервере
 
 Коротко: установка один раз скриптом, дальше новая версия ставится одной командой
-`update.bat` (Windows) или `sudo ./update.sh` (Linux), с копией базы и откатом.
+`update.bat` (Windows) или `sudo bash update.sh` (Linux), с копией базы и откатом.
+Для сервера без интернета пакет обновления собирается на рабочем компьютере:
+`python scripts/make_update_package.py`.
 Пошагово: [docs/DEPLOY_SERVER.md](docs/DEPLOY_SERVER.md).
 
 Ручная настройка:
