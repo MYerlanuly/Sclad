@@ -351,13 +351,23 @@ def register(app):
                     (today_str, OPEN_PAST_LIMIT + 1),
                 )
             ]
-        open_past_more = len(open_past_tasks) > OPEN_PAST_LIMIT
         open_past_tasks = open_past_tasks[:OPEN_PAST_LIMIT]
+        open_past_total = 0
+        if open_past_tasks:
+            open_past_total = fetch_one(
+                """
+                SELECT COUNT(*) AS c FROM shift_tasks
+                WHERE carried_to_task_id IS NULL AND status IN ('pending', 'not_done') AND effective_date < ?
+                """,
+                (today_str,),
+            )["c"]
+        open_past_more = open_past_total > len(open_past_tasks)
         return render_template(
             "shift_tasks_list.html",
             tasks=tasks,
             open_past_tasks=open_past_tasks,
             open_past_more=open_past_more,
+            open_past_total=open_past_total,
             completions_by_task=completions_by_task,
             task_ids_completed_by_me=task_ids_completed_by_me,
             filter_shift=filter_shift,

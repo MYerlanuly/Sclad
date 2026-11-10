@@ -64,12 +64,15 @@
     </div>
 
     {% if open_past_tasks %}
-    <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 overflow-hidden">
-        <div class="px-5 py-3 border-b border-amber-200 bg-white">
-            <h3 class="text-base font-semibold text-slate-800 m-0">Не закрыто с прошлых смен ({{ open_past_tasks|length }}{% if open_past_more %}+{% endif %})</h3>
-            <p class="text-slate-500 text-xs m-0 mt-1">Задания, которые остались «Ожидает» или отмечены «Не выполнено» и ещё не перенесены. Перенесите их на нужную смену.</p>
-        </div>
-        <div class="table-wrap">
+    <details id="open-past-block" class="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 overflow-hidden">
+        <summary class="px-5 py-3 bg-white cursor-pointer select-none flex flex-wrap items-center gap-2">
+            <span class="open-past-arrow text-slate-500">▸</span>
+            <span class="text-base font-semibold text-slate-800">Не закрыто с прошлых смен</span>
+            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-200 text-amber-900">{{ open_past_total }}</span>
+            <span class="open-past-hint text-slate-500 text-xs">нажмите, чтобы показать</span>
+        </summary>
+        <p class="text-slate-500 text-xs m-0 px-5 py-2 border-t border-amber-200 bg-white">Задания, которые остались «Ожидает» или отмечены «Не выполнено» и ещё не перенесены. Перенесите их на нужную смену.</p>
+        <div class="table-wrap" style="max-height: 22rem; overflow-y: auto;">
         <table>
             <thead>
                 <tr>
@@ -111,9 +114,26 @@
         </table>
         </div>
         {% if open_past_more %}
-        <p class="text-slate-500 text-xs px-5 py-2 m-0">Показаны последние {{ open_past_tasks|length }}. Остальные можно найти по дате и фильтру статуса.</p>
+        <p class="text-slate-500 text-xs px-5 py-2 m-0">Показаны последние {{ open_past_tasks|length }} из {{ open_past_total }}. Остальные можно найти по дате и фильтру статуса.</p>
         {% endif %}
-    </div>
+    </details>
+    <style>
+        #open-past-block[open] .open-past-arrow { display: inline-block; transform: rotate(90deg); }
+        #open-past-block[open] .open-past-hint { display: none; }
+        #open-past-block > summary::-webkit-details-marker { display: none; }
+        #open-past-block > summary { list-style: none; }
+    </style>
+    <script>
+    // Блок свёрнут по умолчанию; браузер запоминает, если его раскрыли
+    (function() {
+        var block = document.getElementById('open-past-block');
+        if (!block) return;
+        try { if (localStorage.getItem('shiftTasksOpenPast') === '1') block.open = true; } catch (e) {}
+        block.addEventListener('toggle', function() {
+            try { localStorage.setItem('shiftTasksOpenPast', block.open ? '1' : '0'); } catch (e) {}
+        });
+    })();
+    </script>
     {% endif %}
 
     {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
