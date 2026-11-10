@@ -53,8 +53,11 @@ def register(app):
             except Exception:
                 pass
 
-    _backup_thread = threading.Thread(target=_scheduled_backup_loop, daemon=True)
-    _backup_thread.start()
+    # Поток расписания копий можно отключить (SCLAD_BACKUP_SCHEDULER=0) — так делают тесты,
+    # иначе каждый create_app() в тестах запускал бы свой поток, держащий базу открытой.
+    if os.environ.get("SCLAD_BACKUP_SCHEDULER", "1") != "0":
+        _backup_thread = threading.Thread(target=_scheduled_backup_loop, daemon=True)
+        _backup_thread.start()
 
     @app.route("/backup")
     @login_required

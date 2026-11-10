@@ -13,6 +13,9 @@ import pytest
 _TMP_DIR = tempfile.mkdtemp(prefix="sclad-tests-")
 os.environ["SCLAD_DATABASE"] = os.path.join(_TMP_DIR, "test.db")
 os.environ.setdefault("FLASK_SECRET_KEY", "test-secret-key-" + "x" * 32)
+# Без фонового потока резервных копий: он открывает базу раз в минуту и на Windows
+# не даёт удалить файл базы между тестами.
+os.environ["SCLAD_BACKUP_SCHEDULER"] = "0"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
