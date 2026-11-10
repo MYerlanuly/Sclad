@@ -184,10 +184,11 @@
                     <input type="text" id="machine_search" value="{{ am_label }}" placeholder="Инв. № или модель…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
                     <ul class="combo-list" hidden></ul>
                 </div>
-                <div class="combo" id="equipment_combo">
+                {% set ae_label = (add_equipment.name ~ ' (' ~ add_equipment.serial_number ~ ')' ~ (' — датчик' if add_equipment.equipment_kind == 'sensor' else '')) if add_equipment else '' %}
+                <div class="combo{% if add_equipment %} selected{% endif %}" id="equipment_combo">
                     <label for="equipment_search" class="block text-slate-600 text-sm mb-1">Оборудование <span class="text-slate-400">(необязательно)</span></label>
-                    <input type="hidden" name="equipment_id" value="">
-                    <input type="text" id="equipment_search" placeholder="Название или серийный №…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+                    <input type="hidden" name="equipment_id" value="{{ add_equipment.id if add_equipment else '' }}">
+                    <input type="text" id="equipment_search" value="{{ ae_label }}" placeholder="Название или серийный №…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
                     <ul class="combo-list" hidden></ul>
                 </div>
             </div>
@@ -350,8 +351,8 @@
     // Форма свёрнута по умолчанию; браузер запоминает, если её раскрыли
     try { if (localStorage.getItem('shiftTasksAddOpen') === '1') block.open = true; } catch (e) {}
     // Ссылка «+ Задание на смену» с главной открывает форму сразу
-    // С карточки борта (?machine=…) — тоже, техника уже выбрана
-    if (location.hash === '#add' || {{ 'true' if add_machine else 'false' }}) { block.open = true; block.scrollIntoView({ block: 'start' }); document.getElementById('title').focus(); }
+    // С карточки борта или оборудования (?machine=…, ?equipment=…) — тоже, они уже выбраны
+    if (location.hash === '#add' || {{ 'true' if add_machine or add_equipment else 'false' }}) { block.open = true; block.scrollIntoView({ block: 'start' }); document.getElementById('title').focus(); }
     block.addEventListener('toggle', function() {
         try { localStorage.setItem('shiftTasksAddOpen', block.open ? '1' : '0'); } catch (e) {}
         if (block.open) document.getElementById('title').focus();

@@ -1,0 +1,25 @@
+{# Журнал операций карточки оборудования/SIM: logs — из item_card.card_logs #}
+{% macro log_row(op) %}
+<li class="flex-wrap sm:flex-nowrap" style="row-gap: 4px;">
+    <span class="meta tnum shrink-0 sm:w-[92px]">{{ op.created_at | datetimefmt }}</span>
+    <span class="op-tag op-{{ op.operation_type }}">{{ op.label }}</span>
+    <span class="basis-full sm:basis-auto order-3 sm:order-none flex-1 min-w-0 text-[13px] text-slate-700" style="overflow-wrap: anywhere;">{{ op.description or '' }}</span>
+    {% if op.username %}<span class="meta shrink-0 order-2 sm:order-none ml-auto sm:ml-0" title="Кто выполнил">{{ op.username }}</span>{% endif %}
+</li>
+{% endmacro %}
+<section class="panel lg:col-span-2" id="journal">
+    <div class="panel-head">
+        <h3 class="panel-title">Журнал операций</h3>
+        {% if logs|length >= 50 %}<span class="meta">последние 50</span>{% endif %}
+    </div>
+    {% if logs %}
+    <ul class="rows">{% for op in logs[:6] %}{{ log_row(op) }}{% endfor %}</ul>
+    {% if logs|length > 6 %}
+    <details class="more"><summary>Показать ещё {{ logs|length - 6 }}</summary>
+        <ul class="rows" style="border-top: 1px solid var(--line-soft);">{% for op in logs[6:] %}{{ log_row(op) }}{% endfor %}</ul>
+    </details>
+    {% endif %}
+    {% else %}
+    <p class="empty">Операций пока нет.</p>
+    {% endif %}
+</section>
