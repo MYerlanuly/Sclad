@@ -193,6 +193,82 @@ def test_shift_task_not_done_requires_reason(admin, seed):
     assert row["status"] == "not_done" and row["not_done_reason"] == "Нет запчастей"
 
 
+def _add_task(c, seed, effective_date, for_shift="day", title="Заменить датчик"):
+    c.post("/shift_tasks", data={"action": "add", "for_shift": for_shift, "effective_date": effective_date,
+                                 "title": title, "task_type_id": seed["task_type"], "machine_id": seed["machine"]})
+    return db_scalar("SELECT MAX(id) FROM shift_tasks")
+
+
+def test_not_done_task_can_be_carried_over(client_for, seed):
+    c = client_for("maintenance")
+    tid = _add_task(c, seed, "2026-11-09", "night")
+    c.post(f"/shift_tasks/{tid}/not_done", data={"reason": "Нет запчастей"})
+    # невыполненное нельзя отметить выполненным — только перенести
+    c.post(f"/shift_tasks/{tid}/complete", data={"comment": "x"})
+    assert db_scalar("SELECT status FROM shift_tasks WHERE id = ?", (tid,)) == "not_done"
+    # переносить можно только на более позднюю смену
+    c.post(f"/shift_tasks/{tid}/carry", data={"effective_date": "2026-11-09", "for_shift": "day"})
+    assert db_scalar("SELECT COUNT(*) FROM shift_tasks") == 1
+    c.post(f"/shift_tasks/{tid}/carry", data={"effective_date": "2026-11-10", "for_shift": "day"})
+    old = db_query("SELECT * FROM shift_tasks WHERE id = ?", (tid,))[0]
+    new = db_query("SELECT * FROM shift_tasks WHERE carried_from_task_id = ?", (tid,))[0]
+    assert old["status"] == "not_done" and old["not_done_reason"] == "Нет запчастей"
+    assert old["carried_to_task_id"] == new["id"]
+    assert new["status"] == "pending" and new["effective_date"] == "2026-11-10" and new["for_shift"] == "day"
+    assert new["title"] == "Заменить датчик" and new["machine_id"] == seed["machine"]
+    # повторно перенести нельзя
+    c.post(f"/shift_tasks/{tid}/carry", data={"effective_date": "2026-11-11", "for_shift": "day"})
+    assert db_scalar("SELECT COUNT(*) FROM shift_tasks") == 2
+    # на странице новой смены видна ссылка на исходное задание
+    page = c.get("/shift_tasks?date=2026-11-10").get_data(as_text=True)
+    assert "Перенесено с" in page and "Нет запчастей" in page
+    # удалили копию — исходное снова не закрыто и его можно перенести заново
+    c.post(f"/shift_tasks/{new['id']}/delete")
+    assert db_scalar("SELECT carried_to_task_id FROM shift_tasks WHERE id = ?", (tid,)) is None
+
+
+def test_forgotten_pending_task_is_carried_with_reason(client_for, seed):
+    from datetime import date, timedelta
+    c = client_for("maintenance")
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    tid = _add_task(c, seed, yesterday, "night", title="Забытое задание")
+    future_tid = _add_task(c, seed, (date.today() + timedelta(days=1)).isoformat(), title="Будущее задание")
+    # на сегодняшней странице есть блок с забытым заданием
+    page = c.get("/shift_tasks").get_data(as_text=True)
+    assert "Не закрыто с прошлых смен" in page and "Забытое задание" in page
+    # текущее/будущее «Ожидает» переносить нельзя
+    c.post(f"/shift_tasks/{future_tid}/carry", data={"effective_date": "2030-01-01", "for_shift": "day", "reason": "x"})
+    assert db_scalar("SELECT carried_to_task_id FROM shift_tasks WHERE id = ?", (future_tid,)) is None
+    # без причины забытое не переносится
+    today = date.today().isoformat()
+    c.post(f"/shift_tasks/{tid}/carry", data={"effective_date": today, "for_shift": "day"})
+    assert db_scalar("SELECT carried_to_task_id FROM shift_tasks WHERE id = ?", (tid,)) is None
+    c.post(f"/shift_tasks/{tid}/carry", data={"effective_date": today, "for_shift": "day", "reason": "Техника в работе"})
+    old = db_query("SELECT * FROM shift_tasks WHERE id = ?", (tid,))[0]
+    assert old["status"] == "not_done" and old["not_done_reason"] == "Техника в работе" and old["carried_to_task_id"]
+    # после переноса блок пропадает
+    assert "Не закрыто с прошлых смен" not in c.get("/shift_tasks").get_data(as_text=True)
+
+
+def test_done_task_can_be_marked_not_done_only_by_admin(client_for, admin, seed):
+    c = client_for("maintenance")
+    tid = _add_task(c, seed, "2026-11-10")
+    c.post(f"/shift_tasks/{tid}/complete", data={"comment": "Сделано"})
+    c.post(f"/shift_tasks/{tid}/not_done", data={"reason": "Ошибся"})
+    assert db_scalar("SELECT status FROM shift_tasks WHERE id = ?", (tid,)) == "done"
+    client_for("editor").post(f"/shift_tasks/{tid}/not_done", data={"reason": "Ошибся"})
+    assert db_scalar("SELECT status FROM shift_tasks WHERE id = ?", (tid,)) == "done"
+    admin.post(f"/shift_tasks/{tid}/not_done", data={"reason": "На самом деле не сделано"})
+    assert db_scalar("SELECT status FROM shift_tasks WHERE id = ?", (tid,)) == "not_done"
+
+
+def test_reader_cannot_carry_task(client_for, admin, seed):
+    tid = _add_task(admin, seed, "2026-11-09")
+    admin.post(f"/shift_tasks/{tid}/not_done", data={"reason": "Нет запчастей"})
+    client_for("reader").post(f"/shift_tasks/{tid}/carry", data={"effective_date": "2026-11-10", "for_shift": "day"})
+    assert db_scalar("SELECT COUNT(*) FROM shift_tasks") == 1
+
+
 # ---------- Импорт и экспорт ----------
 
 def _csv(rows):
@@ -334,3 +410,12 @@ def test_parallel_writes_do_not_lose_data(app, seed):
     assert all(code == 302 for code in codes), set(codes)
     assert db_scalar("SELECT COUNT(*) FROM equipment WHERE name = 'Параллельный'") == 100
     assert db_query("PRAGMA integrity_check")[0][0] == "ok"
+
+
+def test_carry_form_opens(client_for, seed):
+    c = client_for("maintenance")
+    tid = _add_task(c, seed, "2026-11-09", "night")
+    c.post(f"/shift_tasks/{tid}/not_done", data={"reason": "Нет запчастей"})
+    resp = c.get(f"/shift_tasks/{tid}/carry")
+    assert resp.status_code == 200
+    assert "Перенести задание" in resp.get_data(as_text=True)

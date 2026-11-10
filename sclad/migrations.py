@@ -738,6 +738,35 @@ def migrate_shift_tasks_status_not_done():
         return False
 
 
+def migrate_shift_tasks_carry_over():
+    """Перенос невыполненных заданий: ссылки на исходное и на новое задание."""
+    if not os.path.exists(DATABASE):
+        return False
+    conn = sqlite3.connect(DATABASE)
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(shift_tasks)").fetchall()]
+        if not cols:
+            return True
+        if "carried_from_task_id" not in cols:
+            conn.execute("ALTER TABLE shift_tasks ADD COLUMN carried_from_task_id INTEGER REFERENCES shift_tasks(id)")
+        if "carried_to_task_id" not in cols:
+            conn.execute("ALTER TABLE shift_tasks ADD COLUMN carried_to_task_id INTEGER REFERENCES shift_tasks(id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_shift_tasks_open ON shift_tasks (status, effective_date) "
+            "WHERE carried_to_task_id IS NULL"
+        )
+        conn.commit()
+        return True
+    except sqlite3.OperationalError as e:
+        # Параллельный воркер мог уже добавить колонку
+        if "duplicate column" in str(e).lower():
+            return True
+        print(f"Ошибка миграции shift_tasks_carry_over: {e}")
+        return False
+    finally:
+        conn.close()
+
+
 def migrate_shift_journal():
     """Журнал смены (перенесён из отдельной программы «Журнал инженеров по АСУ»)."""
     if not os.path.exists(DATABASE):
@@ -805,6 +834,7 @@ MIGRATIONS = (
     migrate_shift_task_done_comment_and_not_done,
     migrate_shift_tasks_status_not_done,
     migrate_shift_journal,
+    migrate_shift_tasks_carry_over,
 )
 
 

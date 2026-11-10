@@ -100,13 +100,14 @@ def register(app):
             if role == "reader":
                 flash("Доступ только для просмотра. Изменения запрещены.", "error")
                 return redirect(request.referrer or url_for("index"))
-            # Роль maintenance — разрешено записывать ТО и работать с заданиями на смену (создавать, выполнять, отмечать не выполнено, редактировать/удалять свои)
+            # Роль maintenance — разрешено записывать ТО и работать с заданиями на смену (создавать, выполнять, отмечать не выполнено, переносить, редактировать/удалять свои)
             if role == "maintenance":
                 allowed_endpoints = {
                     "maintenance_add",
                     "shift_tasks_list",
                     "shift_task_complete",
                     "shift_task_not_done",
+                    "shift_task_carry",
                     "shift_task_edit",
                     "shift_task_delete",
                     # Журнал смены

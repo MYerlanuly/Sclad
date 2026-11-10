@@ -43,6 +43,59 @@
         <button type="submit" class="btn btn-secondary">Показать</button>
     </form>
 
+    {% if open_past_tasks %}
+    <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 overflow-hidden">
+        <div class="px-5 py-3 border-b border-amber-200 bg-white">
+            <h3 class="text-base font-semibold text-slate-800 m-0">Не закрыто с прошлых смен ({{ open_past_tasks|length }}{% if open_past_more %}+{% endif %})</h3>
+            <p class="text-slate-500 text-xs m-0 mt-1">Задания, которые остались «Ожидает» или отмечены «Не выполнено» и ещё не перенесены. Перенесите их на нужную смену.</p>
+        </div>
+        <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Смена</th>
+                    <th>Задание</th>
+                    <th>Статус</th>
+                    {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in open_past_tasks %}
+                <tr>
+                    <td><a href="{{ url_for('shift_tasks_list', date=t.effective_date) }}">{{ t.effective_date | datefmt }}</a></td>
+                    <td>{% if t.for_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}</td>
+                    <td>
+                        <strong>{{ t.title }}</strong>
+                        <span class="text-slate-500 text-xs">{{ t.task_type_name or '' }}{% if t.machine_inventory_number %} · {{ t.machine_inventory_number }}{% endif %}</span>
+                    </td>
+                    <td>
+                        {% if t.status == 'not_done' %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Не выполнено</span>
+                        {% if t.not_done_reason %}<span class="text-slate-600 text-xs">{{ t.not_done_reason }}</span>{% endif %}
+                        {% else %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Не закрыто</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
+                    <td class="whitespace-nowrap">
+                        <a href="{{ url_for('shift_task_carry', task_id=t.id) }}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Перенести</a>
+                        {% if t.status == 'pending' %}
+                        <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Выполнено</a>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% if open_past_more %}
+        <p class="text-slate-500 text-xs px-5 py-2 m-0">Показаны последние {{ open_past_tasks|length }}. Остальные можно найти по дате и фильтру статуса.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
     <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
         <div class="px-5 py-3 border-b border-slate-200 bg-white">
@@ -167,6 +220,9 @@
                 <td>
                     <strong>{{ t.title }}</strong>
                     {% if t.description %}<br><span class="text-slate-600 text-sm">{{ t.description }}</span>{% endif %}
+                    {% if t.carried_from_date %}
+                    <br><span class="text-xs text-indigo-700">↪ Перенесено с <a href="{{ url_for('shift_tasks_list', date=t.carried_from_date) }}">{{ t.carried_from_date | datefmt }}</a>, {% if t.carried_from_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}{% if t.carried_from_reason %}. Причина: {{ t.carried_from_reason }}{% endif %}</span>
+                    {% endif %}
                 </td>
                 <td class="text-slate-600 text-sm">
                     {% if t.machine_inventory_number %}
@@ -193,6 +249,7 @@
                     <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Не выполнено</span>
                     {% if t.not_done_reason %}<br><span class="text-slate-600 text-sm">{{ t.not_done_reason }}</span>{% endif %}
                     {% if t.not_done_by_name or t.not_done_at %}<br><span class="text-slate-500 text-xs">{{ t.not_done_by_name or '—' }} {{ t.not_done_at | datetimefmt if t.not_done_at else '' }}</span>{% endif %}
+                    {% if t.carried_to_date %}<br><span class="text-xs text-indigo-700">→ Перенесено на <a href="{{ url_for('shift_tasks_list', date=t.carried_to_date) }}">{{ t.carried_to_date | datefmt }}</a>, {% if t.carried_to_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}</span>{% endif %}
                     {% else %}
                     <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Ожидает</span>
                     {% endif %}
@@ -209,6 +266,11 @@
                     {% endif %}
                     <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Выполнено</a>
                     <a href="{{ url_for('shift_task_not_done', task_id=t.id) }}" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Не выполнено</a>
+                    {% if t.effective_date < today_str %}
+                    <a href="{{ url_for('shift_task_carry', task_id=t.id) }}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Перенести</a>
+                    {% endif %}
+                    {% elif t.status == 'not_done' and not t.carried_to_task_id %}
+                    <a href="{{ url_for('shift_task_carry', task_id=t.id) }}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Перенести</a>
                     {% elif t.status == 'done' and t.id not in task_ids_completed_by_me %}
                     <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Отметить себя</a>
                     {% else %}
