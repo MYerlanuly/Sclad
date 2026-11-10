@@ -36,7 +36,10 @@ def test_dashboard_shows_current_night_shift_after_midnight(admin, seed, monkeyp
     assert "Дневное не закрыто" not in html
     assert "Завтрашнее" not in html
     # Не закрыто с прошлых смен: дневное 10-го и позавчерашнее
-    assert '<span class="dash-tile-value tabular-nums">2</span>\n    <span class="dash-tile-label">не закрыто с прошлых смен' in html.replace("\r\n", "\n")
+    import re
+
+    m = re.search(r'<span class="kpi-value">(\d+)</span>\s*<span class="kpi-label">Не закрыто с прошлых смен', html)
+    assert m and m.group(1) == "2"
 
 
 def test_dashboard_maintenance_and_operations(admin, seed):
@@ -56,10 +59,11 @@ def test_dashboard_maintenance_and_operations(admin, seed):
         (seed["equipment"],),
     )
     html = admin.get("/").get_data(as_text=True)
-    assert "просрочено 5 дн." in html
+    assert "−5 дн." in html
     assert "через 3 дн." in html
-    assert "Установка" in html
-    assert f'href="/equipment/{seed["equipment"]}">Оборудование</a>: Установлен терминал SN-1' in html
+    assert 'title="Установка"' in html
+    assert "Установлен терминал SN-1" in html
+    assert f'href="/equipment/{seed["equipment"]}" class="lnk' in html
 
 
 @pytest.mark.parametrize(
@@ -68,6 +72,6 @@ def test_dashboard_maintenance_and_operations(admin, seed):
 )
 def test_dashboard_actions_follow_role(client_for, seed, role, sees_shift, sees_edit):
     html = client_for(role).get("/").get_data(as_text=True)
-    assert ("+</span> Записать ТО" in html) is sees_shift
-    assert ("+</span> Оборудование" in html) is sees_edit
+    assert (" Записать ТО</a>" in html) is sees_shift
+    assert ('<details class="act-menu">' in html) is sees_edit
     assert ("Скачать копию базы" in html) is (role == "admin")

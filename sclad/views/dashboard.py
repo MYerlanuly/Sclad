@@ -149,14 +149,14 @@ def _journal_summary(cur_shift, cur_date):
     return {"entries": row["entries"] or 0, "engineers": row["engineers"] or ""}
 
 
-def _when_label(created_at, today):
-    """«сегодня 14:05», «вчера 22:10» или «08.11.26 09:00»."""
-    day, time_part = (created_at or "")[:10], (created_at or "")[11:16]
+def _day_label(created_at, today):
+    """«Сегодня», «Вчера» или «08.11.26» — заголовок группы в ленте операций."""
+    day = (created_at or "")[:10]
     if day == today.isoformat():
-        return f"сегодня {time_part}"
+        return "Сегодня"
     if day == (today - timedelta(days=1)).isoformat():
-        return f"вчера {time_part}"
-    return f"{day[8:10]}.{day[5:7]}.{day[2:4]} {time_part}".strip()
+        return "Вчера"
+    return f"{day[8:10]}.{day[5:7]}.{day[2:4]}"
 
 
 def _recent_operations():
@@ -178,7 +178,8 @@ def _recent_operations():
         op["operation_label"] = OPERATION_LABELS.get(op["operation_type"], op["operation_type"])
         op["tone"] = OPERATION_TONES.get(op["operation_type"], "slate")
         op["url"] = _entity_url(op["entity_type"], op["entity_id"])
-        op["when"] = _when_label(op["created_at"], today)
+        op["day"] = _day_label(op["created_at"], today)
+        op["time"] = (op["created_at"] or "")[11:16]
         ops.append(op)
     return ops
 
