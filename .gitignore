@@ -11,6 +11,10 @@
 *.sqlite
 backups/
 
+# Служебное: журналы сервера и сведения о последнем обновлении (для отката)
+logs/
+.update-state.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -63,6 +63,8 @@ python app.py --env .env.otdel2
 
 ```
 app.py                 точка входа: python app.py или gunicorn app:app
+serve.py               рабочий запуск на Windows-сервере (waitress)
+update.bat, update.sh  обновление на сервере в один шаг (scripts/update.py)
 sclad/                 код приложения
   __init__.py          create_app(): сборка приложения из модулей
   config.py            пути и константы (база, схема, папка копий)
@@ -93,7 +95,7 @@ sclad/                 код приложения
 schema.sql             базовая схема и справочники
 templates/             HTML-шаблоны (Jinja2)
 static/                логотип, Tailwind и Chart.js (локально, для работы без интернета)
-scripts/               вспомогательные скрипты
+scripts/               вспомогательные скрипты, установка на сервер (windows/, linux/)
 tests/                 автотесты и нагрузочный тест
 docs/                  инструкции по развёртыванию и заметки
 ```
@@ -127,7 +129,13 @@ python -m pytest
 python tests/load_test.py --users 20 --seconds 30
 ```
 
-## Развёртывание
+## Развёртывание и обновление на сервере
+
+Коротко: установка один раз скриптом, дальше новая версия ставится одной командой
+`update.bat` (Windows) или `sudo ./update.sh` (Linux), с копией базы и откатом.
+Пошагово: [docs/DEPLOY_SERVER.md](docs/DEPLOY_SERVER.md).
+
+Ручная настройка:
 
 - [docs/DEPLOY_LINUX.md](docs/DEPLOY_LINUX.md): Linux, venv, gunicorn, systemd
 - [docs/DEPLOY_DEBIAN_NGINX.md](docs/DEPLOY_DEBIAN_NGINX.md): Debian с nginx

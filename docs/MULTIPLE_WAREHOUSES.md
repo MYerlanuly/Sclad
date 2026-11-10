@@ -125,5 +125,7 @@ server {
 }
 ```
 
-После обновления кода (`git pull`) перезапустите все службы складов:
-`sudo systemctl restart sclad sclad-otdel2`.
+Проще поставить склад скриптом `sudo scripts/linux/install.sh .env.otdel2` (Windows:
+`scripts\windows\install.bat .env.otdel2`), см. [DEPLOY_SERVER.md](DEPLOY_SERVER.md).
+Обновление `update.bat` / `sudo ./update.sh` само находит все склады: копирует их базы,
+применяет миграции и перезапускает все службы `sclad*`.
