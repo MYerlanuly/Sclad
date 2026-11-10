@@ -419,3 +419,21 @@ def test_carry_form_opens(client_for, seed):
     resp = c.get(f"/shift_tasks/{tid}/carry")
     assert resp.status_code == 200
     assert "Перенести задание" in resp.get_data(as_text=True)
+
+
+def test_shift_tasks_period_filter_and_search(admin, seed):
+    _add_task(admin, seed, "2026-11-01", title="Первое задание")
+    _add_task(admin, seed, "2026-11-05", title="Второе задание")
+    _add_task(admin, seed, "2026-11-09", title="Третье задание")
+
+    def titles(query):
+        page = admin.get("/shift_tasks?" + query).get_data(as_text=True)
+        return {t for t in ("Первое", "Второе", "Третье") if f"{t} задание" in page}
+
+    assert titles("date=2026-11-05") == {"Второе"}
+    assert titles("date_from=2026-11-02&date_to=2026-11-09") == {"Второе", "Третье"}
+    assert titles("date_from=2026-11-09&date_to=2026-11-02") == {"Второе", "Третье"}  # даты перепутаны
+    assert titles("date_from=2026-11-05&date_to=") == {"Второе", "Третье"}
+    assert titles("date_from=&date_to=") == {"Первое", "Второе", "Третье"}  # все
+    assert titles("date_from=&date_to=&q=втор") == {"Второе"}
+    assert titles("date_from=&date_to=&q=inv-001") == {"Первое", "Второе", "Третье"}

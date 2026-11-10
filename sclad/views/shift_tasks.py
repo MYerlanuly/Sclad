@@ -8,6 +8,19 @@ from flask_login import current_user
 from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
 from ..utils import to_int, to_iso_date
 
+def _period_presets(today):
+    """Быстрые кнопки периода: (название, с, по). Пустые даты — все задания."""
+    yesterday = today - timedelta(days=1)
+    return [
+        ("Сегодня", today.isoformat(), today.isoformat()),
+        ("Вчера", yesterday.isoformat(), yesterday.isoformat()),
+        ("7 дней", (today - timedelta(days=6)).isoformat(), today.isoformat()),
+        ("30 дней", (today - timedelta(days=29)).isoformat(), today.isoformat()),
+        ("Этот месяц", today.replace(day=1).isoformat(), today.isoformat()),
+        ("Все", "", ""),
+    ]
+
+
 # Сколько не закрытых заданий с прошлых смен показывать на сегодняшней странице
 OPEN_PAST_LIMIT = 50
 
@@ -118,11 +131,32 @@ def register(app):
         filter_shift = request.args.get("shift", "").strip().lower() or None
         if filter_shift not in ("day", "night"):
             filter_shift = None
-        filter_date = (request.args.get("date") or "").strip()[:10] or today_str
+        # Период: date_from/date_to (пустые — без ограничения, обе пустые — все даты).
+        # Старый параметр date=ГГГГ-ММ-ДД оставлен для ссылок на конкретный день.
+        # Без параметров — сегодняшний день.
+        if "date_from" in request.args or "date_to" in request.args:
+            filter_date_from = to_iso_date(request.args.get("date_from")) or ""
+            filter_date_to = to_iso_date(request.args.get("date_to")) or ""
+        else:
+            single = to_iso_date(request.args.get("date")) or today_str
+            filter_date_from = filter_date_to = single
+        if filter_date_from and filter_date_to and filter_date_from > filter_date_to:
+            filter_date_from, filter_date_to = filter_date_to, filter_date_from
+        filter_q = (request.args.get("q") or "").strip()[:100]
+        # Дата по умолчанию в форме добавления: выбранный день, иначе сегодня
+        filter_date = filter_date_from if filter_date_from and filter_date_from == filter_date_to else today_str
         filter_type_id = to_int(request.args.get("type"))
         filter_status = (request.args.get("status") or "").strip().lower() or None
         if filter_status not in ("pending", "done", "not_done"):
             filter_status = None
+        filter_args = {
+            "date_from": filter_date_from,
+            "date_to": filter_date_to,
+            "shift": filter_shift or "",
+            "type": filter_type_id or "",
+            "status": filter_status or "",
+            "q": filter_q,
+        }
 
         if request.method == "POST" and request.form.get("action") == "add":
             if not current_user.is_authenticated:
@@ -172,17 +206,28 @@ def register(app):
                 return redirect(
                     url_for(
                         "shift_tasks_list",
-                        shift=filter_shift,
-                        date=filter_date,
-                        type=filter_type_id or "",
-                        status=filter_status or "",
+                        **filter_args,
                         page=1,
                         per_page=request.args.get("per_page", 50),
                     )
                 )
 
-        where_parts = ["st.effective_date = ?"]
-        params = [filter_date]
+        where_parts = ["1 = 1"]
+        params = []
+        if filter_date_from:
+            where_parts.append("st.effective_date >= ?")
+            params.append(filter_date_from)
+        if filter_date_to:
+            where_parts.append("st.effective_date <= ?")
+            params.append(filter_date_to)
+        if filter_q:
+            like = f"%{filter_q.casefold()}%"
+            where_parts.append(
+                """(CASEFOLD(st.title) LIKE ? OR CASEFOLD(COALESCE(st.description, '')) LIKE ?
+                    OR st.machine_id IN (SELECT id FROM machines WHERE CASEFOLD(inventory_number) LIKE ?)
+                    OR st.equipment_id IN (SELECT id FROM equipment WHERE CASEFOLD(name) LIKE ? OR CASEFOLD(serial_number) LIKE ?))"""
+            )
+            params.extend([like] * 5)
         if filter_shift:
             where_parts.append("st.for_shift = ?")
             params.append(filter_shift)
@@ -231,7 +276,7 @@ def register(app):
                 LEFT JOIN shift_tasks src ON st.carried_from_task_id = src.id
                 LEFT JOIN shift_tasks dst ON st.carried_to_task_id = dst.id
                 WHERE {where_sql}
-                ORDER BY st.for_shift, st.created_at DESC
+                ORDER BY st.effective_date DESC, st.for_shift, st.created_at DESC
                 LIMIT ? OFFSET ?
                 """,
                 (*params, per_page, offset),
@@ -286,7 +331,7 @@ def register(app):
         # Не закрытые задания с прошлых смен: забытые «Ожидает» и не перенесённые «Не выполнено».
         # Показываются только на сегодняшней странице.
         open_past_tasks = []
-        if filter_date == today_str:
+        if filter_date_from == today_str and filter_date_to == today_str:
             open_past_tasks = [
                 dict(r)
                 for r in fetch_all(
@@ -317,6 +362,11 @@ def register(app):
             task_ids_completed_by_me=task_ids_completed_by_me,
             filter_shift=filter_shift,
             filter_date=filter_date,
+            filter_date_from=filter_date_from,
+            filter_date_to=filter_date_to,
+            filter_q=filter_q,
+            filter_args=filter_args,
+            period_presets=_period_presets(date.today()),
             filter_type_id=filter_type_id,
             filter_status=filter_status,
             today_str=today_str,

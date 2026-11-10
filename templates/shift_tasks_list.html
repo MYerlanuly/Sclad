@@ -11,8 +11,12 @@
     <form method="get" action="{{ url_for('shift_tasks_list') }}" class="filters flex flex-wrap items-center gap-3 mb-4" id="shift-tasks-filters">
         <input type="hidden" name="page" value="1">
         <label class="flex items-center gap-2">
-            <span class="text-slate-600 font-medium text-sm">Дата смены:</span>
-            <input type="date" name="date" value="{{ filter_date }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+            <span class="text-slate-600 font-medium text-sm">Период с:</span>
+            <input type="date" name="date_from" value="{{ filter_date_from }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">по:</span>
+            <input type="date" name="date_to" value="{{ filter_date_to }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
         </label>
         <label class="flex items-center gap-2">
             <span class="text-slate-600 font-medium text-sm">Смена:</span>
@@ -40,8 +44,24 @@
                 <option value="not_done" {% if filter_status == 'not_done' %}selected{% endif %}>Не выполнено</option>
             </select>
         </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Поиск:</span>
+            <input type="search" name="q" value="{{ filter_q }}" placeholder="Текст, инв. №, оборудование" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" style="width: 14rem;">
+        </label>
         <button type="submit" class="btn btn-secondary">Показать</button>
     </form>
+    <div class="flex flex-wrap items-center gap-2 mb-4 -mt-2 text-sm">
+        <span class="text-slate-500">Быстро:</span>
+        {% for label, p_from, p_to in period_presets %}
+        {% set active = (p_from == filter_date_from and p_to == filter_date_to) %}
+        <a href="{{ url_for('shift_tasks_list', page=1, **dict(filter_args, date_from=p_from, date_to=p_to)) }}"
+           class="px-2.5 py-1 rounded-full border {% if active %}bg-primary-600 border-primary-600 text-white{% else %}border-slate-300 text-slate-700 bg-white hover:bg-slate-100{% endif %}" style="text-decoration: none;">{{ label }}</a>
+        {% endfor %}
+        {% if filter_q or filter_shift or filter_type_id or filter_status %}
+        <a href="{{ url_for('shift_tasks_list', date_from=filter_date_from, date_to=filter_date_to) }}" class="text-slate-500 ml-2">Сбросить фильтры</a>
+        {% endif %}
+        {% if pagination %}<span class="text-slate-500 ml-auto">Найдено: {{ pagination.total }}</span>{% endif %}
+    </div>
 
     {% if open_past_tasks %}
     <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 overflow-hidden">
@@ -185,13 +205,13 @@
 
     {% if pagination %}
     <p class="text-sm text-slate-600 mb-2">На странице:
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=20) }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=20, **filter_args) }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
         <span class="text-slate-400">|</span>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=50) }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=50, **filter_args) }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
         <span class="text-slate-400">|</span>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=100) }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=100, **filter_args) }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
         <span class="text-slate-400">|</span>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=200) }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=200, **filter_args) }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
     </p>
     {% endif %}
 
@@ -281,7 +301,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="{{ 8 if (current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance')) else 7 }}" class="muted">Заданий на выбранную дату и смену нет.</td>
+                <td colspan="{{ 8 if (current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance')) else 7 }}" class="muted">Заданий за выбранный период нет.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -292,12 +312,12 @@
         <span class="shrink-0">Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
         <div class="flex gap-2">
         {% if pagination.page > 1 %}
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.page - 1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+        <a href="{{ url_for('shift_tasks_list', page=pagination.page - 1, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
         {% endif %}
         {% if pagination.page < pagination.total_pages %}
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.page + 1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.total_pages, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+        <a href="{{ url_for('shift_tasks_list', page=pagination.page + 1, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+        <a href="{{ url_for('shift_tasks_list', page=pagination.total_pages, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
         {% endif %}
         </div>
     </div>
