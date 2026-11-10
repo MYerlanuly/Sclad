@@ -261,10 +261,11 @@
                     </div>
                 </details>
                 <details class="nav-drop">
-                    <summary class="nav-drop-trigger {% if request.endpoint == 'operations_list' or (request.endpoint and request.endpoint.startswith('maintenance')) or (request.endpoint and request.endpoint.startswith('shift_')) %}active{% endif %}">Операции</summary>
+                    <summary class="nav-drop-trigger {% if request.endpoint == 'operations_list' or (request.endpoint and request.endpoint.startswith('maintenance')) or (request.endpoint and request.endpoint.startswith('shift_')) or (request.endpoint and request.endpoint.startswith('journal')) %}active{% endif %}">Операции</summary>
                     <div class="nav-dropdown">
                         <a href="{{ url_for('operations_list') }}" class="{% if request.endpoint == 'operations_list' %}active{% endif %}">Журнал операций</a>
                         <a href="{{ url_for('maintenance_list') }}" class="{% if request.endpoint and request.endpoint.startswith('maintenance') %}active{% endif %}">Техобслуживание</a>
+                        <a href="{{ url_for('journal') }}" class="{% if request.endpoint and request.endpoint.startswith('journal') %}active{% endif %}">Журнал смены</a>
                         <a href="{{ url_for('shift_tasks_list') }}" class="{% if request.endpoint == 'shift_tasks_list' %}active{% endif %}">Задания на смену</a>
                         <a href="{{ url_for('shift_task_types_list') }}" class="{% if request.endpoint and request.endpoint.startswith('shift_task_type') %}active{% endif %}">Типы заданий</a>
                     </div>

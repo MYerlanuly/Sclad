@@ -13,6 +13,7 @@ FIELDS = [
     "personnel_number", "title", "for_shift", "effective_date", "task_type_id", "machine_id", "equipment_id",
     "sim_card_id", "sensor_position_id", "performed_at", "engineers", "remarks", "reason", "comment",
     "maintenance_interval_months", "backup_dir", "backup_schedule", "backup_time", "backup_weekday",
+    "entry_time", "content", "note", "date", "shift", "mail_to", "mail_cc",
 ]
 
 
@@ -59,7 +60,8 @@ def test_garbage_in_query_params(app, admin, seed, value):
     failures = []
     for url in ["/equipment", "/machines", "/sim_cards", "/operations", "/maintenance", "/maintenance/calendar",
                 "/reports", "/shift_tasks", "/reports/export", "/operations/export", "/maintenance/act-draft",
-                f"/machines/{seed['machine']}/install_equipment", f"/machines/{seed['machine']}/install_sim"]:
+                f"/machines/{seed['machine']}/install_equipment", f"/machines/{seed['machine']}/install_sim", "/journal", "/journal/search",
+                "/journal/export.docx", "/journal/mail.eml"]:
         for param in ("page", "per_page", "status", "year", "month", "date", "machine_id", "shift", "from", "to",
                       "date_from", "date_to", "type", "sort", "order", "q"):
             resp = admin.get(url, query_string={param: value})
@@ -74,7 +76,7 @@ def test_missing_ids_in_url_do_not_crash(app, admin):
                 "/machines/999/edit", "/sim_cards/999/edit", "/users/999/edit", "/shift_tasks/999/edit",
                 "/machines/999/install_equipment", "/machines/999/install_sim", "/machine_types/999/edit",
                 "/machine_models/999/edit", "/sensor_positions/999/edit", "/shift_task_types/999/edit",
-                "/shift_tasks/999/complete", "/shift_tasks/999/not_done", "/maintenance/add/999"]:
+                "/shift_tasks/999/complete", "/shift_tasks/999/not_done", "/maintenance/add/999", "/journal/entries/999/edit"]:
         resp = admin.get(url)
         assert resp.status_code < 500, f"{url} -> {resp.status_code}"
 

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Адресаты письма журнала{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('journal'), 'Журнал смены'), (none, 'Адресаты письма')]) }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width: 720px;">
+    <div class="card-header">
+        <div class="card-title">Адресаты письма со сводкой смены</div>
+    </div>
+    <form method="post" action="{{ url_for('journal_settings') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="mail_to">Кому</label>
+            <input type="text" id="mail_to" name="mail_to" value="{{ mail_to }}" placeholder="name@example.kz">
+        </div>
+        <div class="field">
+            <label for="mail_cc">Копия</label>
+            <input type="text" id="mail_cc" name="mail_cc" value="{{ mail_cc }}">
+            <p class="text-slate-500 text-sm mt-1">Несколько адресов — через точку с запятой.</p>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+</div>
+{% endblock %}

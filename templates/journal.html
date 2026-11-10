@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Журнал смены{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Журнал смены')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="card-title">Журнал смены: {{ title }}</div>
+            {% if is_current %}
+            <span class="badge" style="background:#dcfce7;color:#166534;">Текущая смена</span>
+            {% else %}
+            <span class="badge">Прошлая смена, только просмотр</span>
+            {% endif %}
+        </div>
+        <div class="flex flex-wrap gap-2 no-print">
+            <a href="{{ url_for('journal_search') }}" class="btn btn-secondary">Поиск по журналу</a>
+            {% if current_user.is_admin %}<a href="{{ url_for('journal_settings') }}" class="btn btn-secondary">Адресаты письма</a>{% endif %}
+        </div>
+    </div>
+
+    <form method="get" action="{{ url_for('journal') }}" class="filters flex flex-wrap items-center gap-3 mb-4 no-print">
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Дата смены:</span>
+            <input type="date" name="date" value="{{ shift_date }}" max="{{ current_date }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Смена:</span>
+            <select name="shift" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                {% for code, label in shift_labels.items() %}
+                <option value="{{ code }}" {% if shift == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="btn btn-secondary">Показать</button>
+        {% if not is_current %}<a href="{{ url_for('journal') }}" class="text-blue-600 hover:underline text-sm">К текущей смене</a>{% endif %}
+    </form>
+    <p class="text-slate-500 text-sm mb-4">1-я смена — с 08:30 до 20:30, 2-я — с 20:30 до 08:30 (записи после полуночи относятся ко 2-й смене предыдущего дня). Добавлять, изменять и удалять записи можно только в текущей смене.</p>
+
+    <h3 class="text-base font-semibold text-slate-800 mb-2">Инженеры на смене</h3>
+    <ul class="mb-3" id="journal-engineers">
+        {% for e in engineers %}
+        <li class="flex items-center gap-2 py-1">
+            <span>{{ e.name }}</span>
+            {% if editable %}
+            <form method="post" action="{{ url_for('journal_engineer_remove', row_id=e.id) }}" class="inline no-print" onsubmit='return confirm({{ ("Убрать " ~ e.name ~ " со смены?")|tojson }});'>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="text-red-600 hover:underline text-sm" style="background:none;border:none;cursor:pointer;">убрать</button>
+            </form>
+            {% endif %}
+        </li>
+        {% else %}
+        <li class="text-slate-500">Никто не отмечен.</li>
+        {% endfor %}
+    </ul>
+    {% if editable %}
+    <form method="post" action="{{ url_for('journal_engineer_add') }}" class="flex flex-wrap items-end gap-3 mb-6 no-print">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field mb-0" style="min-width:220px;">
+            <label for="engineer_user_id">Добавить на смену</label>
+            <select id="engineer_user_id" name="user_id">
+                <option value="">— выберите пользователя —</option>
+                {% for u in users %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field mb-0" style="min-width:220px;">
+            <label for="engineer_name">или впишите ФИО</label>
+            <input type="text" id="engineer_name" name="name" maxlength="255" placeholder="Если нет учётной записи">
+        </div>
+        <button type="submit" class="btn btn-secondary">Добавить</button>
+    </form>
+    {% endif %}
+
+    {% if editable %}
+    <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4 no-print">
+        <h3 class="text-base font-semibold text-slate-800 mb-3">Новая запись</h3>
+        <form method="post" action="{{ url_for('journal_entry_add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="date" value="{{ shift_date }}">
+            <input type="hidden" name="shift" value="{{ shift }}">
+            <div class="grid gap-3" style="grid-template-columns: 110px 1fr 1fr;">
+                <div class="field mb-0">
+                    <label for="entry_time">Время *</label>
+                    <input type="text" id="entry_time" name="entry_time" value="{{ now_time }}" required pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" inputmode="numeric">
+                </div>
+                <div class="field mb-0">
+                    <label for="content">Содержание *</label>
+                    <textarea id="content" name="content" required rows="3"></textarea>
+                </div>
+                <div class="field mb-0">
+                    <label for="note">Примечание</label>
+                    <textarea id="note" name="note" rows="3"></textarea>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Добавить запись</button>
+        </form>
+    </div>
+    {% elif can_write and not is_current %}
+    <p class="text-slate-500 text-sm mb-4">Это прошлая смена: записи и состав доступны только для просмотра.</p>
+    {% endif %}
+
+    <h3 class="text-base font-semibold text-slate-800 mb-2">Записи журнала</h3>
+    <div class="table-wrap">
+    <table id="journal-entries">
+        <thead>
+            <tr>
+                <th style="width:80px;">Время</th>
+                <th>Содержание</th>
+                <th>Примечание</th>
+                <th class="no-print">Автор</th>
+                {% if editable %}<th class="no-print"></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for e in entries %}
+            <tr>
+                <td>{{ e.entry_time }}</td>
+                <td style="white-space:pre-line;">{{ e.content }}</td>
+                <td style="white-space:pre-line;">{{ e.note }}</td>
+                <td class="text-slate-500 text-sm no-print">{% if e.surname or e.first_name %}{{ e.surname }} {{ e.first_name }}{% else %}{{ e.username or '—' }}{% endif %}</td>
+                {% if editable %}
+                <td class="no-print whitespace-nowrap">
+                    <a href="{{ url_for('journal_entry_edit', entry_id=e.id) }}" class="text-blue-600 hover:underline text-sm">Изменить</a>
+                    <form method="post" action="{{ url_for('journal_entry_delete', entry_id=e.id) }}" class="inline" onsubmit="return confirm('Удалить запись {{ e.entry_time }}?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="text-red-600 hover:underline text-sm ml-2" style="background:none;border:none;cursor:pointer;">Удалить</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-slate-500">Записей нет.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mt-4 no-print">
+        <a href="{{ url_for('journal_mail_eml', date=shift_date, shift=shift) }}" class="btn btn-primary" title="Откроется в Outlook как новое письмо: проверьте и нажмите «Отправить»">Письмо в Outlook</a>
+        <button type="button" class="btn btn-secondary" id="journal-copy">Скопировать таблицу для письма</button>
+        <a href="{{ url_for('journal_export_docx', date=shift_date, shift=shift) }}" class="btn btn-secondary">Скачать в Word</a>
+    </div>
+    <p class="text-slate-500 text-sm mt-2 no-print">
+        «Письмо в Outlook» скачивает письмо{% if mail_to %} для {{ mail_to }}{% if mail_cc %} (копия {{ mail_cc }}){% endif %}{% endif %}.
+        Откройте файл — Outlook покажет его как новое письмо, останется нажать «Отправить».
+        Чтобы файл открывался сразу, в списке загрузок браузера выберите «Всегда открывать файлы этого типа».
+        Если Outlook не открылся, нажмите «Скопировать таблицу» и вставьте её в письмо (Ctrl+V).
+    </p>
+    <div id="journal-mail-html" style="position:absolute;left:-10000px;top:0;" aria-hidden="true">{{ mail_html|safe }}</div>
+</div>
+<script>
+(function(){
+    var btn = document.getElementById('journal-copy');
+    var src = document.getElementById('journal-mail-html');
+    if (!btn || !src) return;
+    btn.addEventListener('click', function(){
+        var range = document.createRange();
+        range.selectNodeContents(src);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        sel.removeAllRanges();
+        btn.textContent = ok ? 'Скопировано — вставьте в письмо (Ctrl+V)' : 'Не удалось скопировать';
+        setTimeout(function(){ btn.textContent = 'Скопировать таблицу для письма'; }, 3000);
+    });
+    // Время в формате ЧЧ:ММ: двоеточие ставится само, как в старой программе
+    var t = document.getElementById('entry_time');
+    if (t) t.addEventListener('input', function(){
+        var v = t.value.replace(/[^0-9]/g, '').slice(0, 4);
+        t.value = v.length > 2 ? v.slice(0, 2) + ':' + v.slice(2) : v;
+    });
+})();
+</script>
+{% endblock %}
