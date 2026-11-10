@@ -2,12 +2,9 @@
 {% block title %}Техобслуживание{% endblock %}
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Техобслуживание')]) }}{% endblock %}
 {% block content %}
-{# Параметры фильтра, которые переносятся в ссылки (страницы, плитки, «на странице»). #}
-{% set base_args = {} %}
-{% if filter_type is not none %}{% set _ = base_args.update({'type': filter_type}) %}{% endif %}
-{% if filter_q %}{% set _ = base_args.update({'q': filter_q}) %}{% endif %}
-{% set filter_args = dict(base_args) %}
-{% if filter_status %}{% set _ = filter_args.update({'status': filter_status}) %}{% endif %}
+{% from "_sort.html" import sort_th %}
+{# base_args — фильтры без статуса (для плиток), filter_args — с статусом, nav_args — плюс сортировка. #}
+{% set nav_args = dict(filter_args, **sort_args) %}
 {% set tiles = [
     ('overdue', 'Просрочено', 'border-red-200 bg-red-50 text-red-800', 'ring-red-400'),
     ('due_soon', 'Скоро ТО', 'border-amber-200 bg-amber-50 text-amber-800', 'ring-amber-400'),
@@ -26,13 +23,13 @@
     {% include "_maintenance_tabs.html" %}
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4" id="maintenance-tiles">
-        <a href="{{ url_for('maintenance_list', **base_args) }}"
+        <a href="{{ url_for('maintenance_list', **dict(base_args, **sort_args)) }}"
            class="block rounded-xl border border-blue-200 bg-blue-50 text-blue-800 px-4 py-3 hover:shadow-sm no-underline {{ 'ring-2 ring-blue-400' if not filter_status else '' }}">
             <div class="text-2xl font-semibold leading-tight">{{ total_all }}</div>
             <div class="text-sm">Вся техника</div>
         </a>
         {% for key, label, cls, ring in tiles %}
-        <a href="{{ url_for('maintenance_list', status=key, **base_args) }}"
+        <a href="{{ url_for('maintenance_list', **dict(base_args, status=key, **sort_args)) }}"
            class="block rounded-xl border {{ cls }} px-4 py-3 hover:shadow-sm no-underline {{ 'ring-2 ' ~ ring if filter_status == key else '' }}">
             <div class="text-2xl font-semibold leading-tight">{{ status_counts[key] }}</div>
             <div class="text-sm">{{ label }}{% if key == 'due_soon' %} <span class="opacity-70">(14 дн.)</span>{% endif %}</div>
@@ -40,13 +37,14 @@
         {% endfor %}
     </div>
 
-    <form method="get" action="{{ url_for('maintenance_list') }}" class="filters flex flex-wrap gap-3 items-center text-sm mb-3" id="maintenance-filters">
+    <form method="get" action="{{ url_for('maintenance_list') }}" class="filters flex flex-wrap gap-x-4 gap-y-2 items-center text-sm mb-3" id="maintenance-filters">
         {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
         {% if pagination.per_page != 50 %}<input type="hidden" name="per_page" value="{{ pagination.per_page }}">{% endif %}
+        {% for k, v in sort_args.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
         <input type="search" name="q" value="{{ filter_q }}" placeholder="Инв. номер или модель" autocomplete="off"
                class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" style="min-width: 14rem;">
         <label class="flex items-center gap-2">
-            <span class="text-slate-600 font-medium">Тип техники:</span>
+            <span class="text-slate-600 font-medium">Тип:</span>
             <select name="type" id="filter-type" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
                 <option value="">Все</option>
                 {% for t in machine_types %}
@@ -54,8 +52,34 @@
                 {% endfor %}
             </select>
         </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Модель:</span>
+            <select name="model" id="filter-model" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for mm in machine_models %}
+                    <option value="{{ mm.id }}" {{ 'selected' if filter_model == mm.id else '' }}>{{ mm.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Исполнитель:</span>
+            <select name="engineer" id="filter-engineer" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for e in engineers %}
+                    <option value="{{ e.label }}" {{ 'selected' if filter_engineer == e.label else '' }}>{{ e.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Следующее ТО с:</span>
+            <input type="date" name="next_from" value="{{ filter_next_from }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">по:</span>
+            <input type="date" name="next_to" value="{{ filter_next_to }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
         <button type="submit" class="btn btn-secondary">Найти</button>
-        {% if filter_args %}<a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary">Сбросить</a>{% endif %}
+        {% if filter_args or sort_args %}<a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary">Сбросить</a>{% endif %}
         <span class="text-slate-500 ml-auto">Найдено: {{ pagination.total }}</span>
     </form>
 
@@ -65,14 +89,14 @@
     <table>
         <thead>
             <tr>
-                <th>Инв. номер</th>
-                <th>Тип</th>
-                <th>Модель</th>
-                <th>Последнее ТО</th>
-                <th>Следующее ТО</th>
-                <th>Осталось</th>
-                <th>Статус</th>
-                <th>Исполнители</th>
+                {{ sort_th('maintenance_list', 'inv', 'Инв. номер', sort_key, sort_dir, filter_args) }}
+                {{ sort_th('maintenance_list', 'type', 'Тип', sort_key, sort_dir, filter_args) }}
+                {{ sort_th('maintenance_list', 'model', 'Модель', sort_key, sort_dir, filter_args) }}
+                {{ sort_th('maintenance_list', 'last', 'Последнее ТО', sort_key, sort_dir, filter_args, 'desc') }}
+                {{ sort_th('maintenance_list', 'next', 'Следующее ТО', sort_key, sort_dir, filter_args) }}
+                {{ sort_th('maintenance_list', 'days', 'Осталось', sort_key, sort_dir, filter_args) }}
+                {{ sort_th('maintenance_list', 'status', 'Статус', sort_key, sort_dir, filter_args) }}
+                {{ sort_th('maintenance_list', 'by', 'Исполнители', sort_key, sort_dir, filter_args) }}
                 <th></th>
             </tr>
         </thead>
@@ -104,7 +128,7 @@
                     {% endif %}
                 </td>
                 <td class="text-slate-600 text-sm">{{ m.last_performed_by or '—' }}</td>
-                <td>
+                <td class="whitespace-nowrap">
                     <a href="{{ url_for('maintenance_add', machine_id=m.id) }}" class="btn btn-secondary">Записать ТО</a>
                 </td>
             </tr>
@@ -121,17 +145,17 @@
         {% if pagination.total_pages > 1 %}
         <span>Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
         {% if pagination.page > 1 %}
-        <a href="{{ url_for('maintenance_list', page=1, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">В начало</a>
-        <a href="{{ url_for('maintenance_list', page=pagination.page - 1, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">← Предыдущая</a>
+        <a href="{{ url_for('maintenance_list', page=1, per_page=pagination.per_page, **nav_args) }}" class="text-blue-600 hover:underline">В начало</a>
+        <a href="{{ url_for('maintenance_list', page=pagination.page - 1, per_page=pagination.per_page, **nav_args) }}" class="text-blue-600 hover:underline">← Предыдущая</a>
         {% endif %}
         {% if pagination.page < pagination.total_pages %}
-        <a href="{{ url_for('maintenance_list', page=pagination.page + 1, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">Следующая →</a>
-        <a href="{{ url_for('maintenance_list', page=pagination.total_pages, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">В конец</a>
+        <a href="{{ url_for('maintenance_list', page=pagination.page + 1, per_page=pagination.per_page, **nav_args) }}" class="text-blue-600 hover:underline">Следующая →</a>
+        <a href="{{ url_for('maintenance_list', page=pagination.total_pages, per_page=pagination.per_page, **nav_args) }}" class="text-blue-600 hover:underline">В конец</a>
         {% endif %}
         {% endif %}
         <span class="ml-auto">На странице:
             {% for n in [20, 50, 100, 200] %}
-            <a href="{{ url_for('maintenance_list', per_page=n, page=1, **filter_args) }}" class="{% if pagination.per_page == n %}font-semibold{% endif %}">{{ n }}</a>{% if not loop.last %} <span class="text-slate-400">|</span>{% endif %}
+            <a href="{{ url_for('maintenance_list', per_page=n, page=1, **nav_args) }}" class="{% if pagination.per_page == n %}font-semibold{% endif %}">{{ n }}</a>{% if not loop.last %} <span class="text-slate-400">|</span>{% endif %}
             {% endfor %}
         </span>
     </div>
@@ -140,7 +164,12 @@
 (function(){
     var form = document.getElementById('maintenance-filters');
     var typeSel = document.getElementById('filter-type');
-    if (form && typeSel) typeSel.addEventListener('change', function(){ form.submit(); });
+    var modelSel = document.getElementById('filter-model');
+    if (form && typeSel) typeSel.addEventListener('change', function(){ if (modelSel) modelSel.value = ''; form.submit(); });
+    ['filter-model', 'filter-engineer'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (form && el) el.addEventListener('change', function(){ form.submit(); });
+    });
 })();
 </script>
 {% endblock %}

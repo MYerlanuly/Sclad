@@ -1,0 +1,9 @@
+{# Заголовок колонки с сортировкой по клику: 1-й клик — first_dir, повторный — обратное направление. #}
+{% macro sort_th(endpoint, key, label, sort_key, sort_dir, args, first_dir='asc') -%}
+{%- set active = sort_key == key -%}
+{%- set next_dir = (('desc' if sort_dir == 'asc' else 'asc') if active else first_dir) -%}
+<th{% if active %} aria-sort="{{ 'ascending' if sort_dir == 'asc' else 'descending' }}"{% endif %}>
+    <a href="{{ url_for(endpoint, **dict(args, sort=key, dir=next_dir)) }}" class="sort-th inline-flex items-center gap-1 whitespace-nowrap {{ 'text-primary-700' if active else 'text-inherit' }}"
+       style="text-decoration: none; color: inherit;" title="Сортировать">{{ label }}<span class="text-xs {{ '' if active else 'opacity-30' }}">{% if active %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% else %}↕{% endif %}</span></a>
+</th>
+{%- endmacro %}
