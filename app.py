@@ -370,6 +370,15 @@ def migrate_indexes():
                 conn.execute(sql)
             except sqlite3.OperationalError:
                 pass
+        # Одно оборудование может быть активно установлено только на одну технику.
+        # Если в старой базе уже есть такие дубли, индекс не создаётся и выводится предупреждение.
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_machine_equipment_active_equipment "
+                "ON machine_equipment (equipment_id) WHERE removed_at IS NULL"
+            )
+        except (sqlite3.IntegrityError, sqlite3.OperationalError) as e:
+            print(f"Предупреждение: оборудование активно установлено на несколько машин, проверьте machine_equipment: {e}")
         conn.commit()
         conn.close()
         return True
@@ -3566,6 +3575,24 @@ def create_app():
 
     # --- Equipment installation on machine ---
 
+    def _insert_equipment_link(machine_id, equipment_id, sensor_position_id):
+        """Записать установку оборудования. False, если его/позицию успел занять другой запрос."""
+        db = get_db()
+        try:
+            db.execute(
+                """
+                INSERT INTO machine_equipment (machine_id, equipment_id, installed_at, sensor_position_id)
+                VALUES (?, ?, ?, ?)
+                """,
+                (machine_id, equipment_id, datetime.now().isoformat(sep=" ", timespec="seconds"), sensor_position_id),
+            )
+            db.execute("UPDATE equipment SET status_id = 2 WHERE id = ?", (equipment_id,))
+            db.commit()
+            return True
+        except sqlite3.IntegrityError:
+            db.rollback()
+            return False
+
     @app.route("/machines/<int:machine_id>/install_equipment", methods=["GET", "POST"])
     def install_equipment(machine_id):
         machine = fetch_one("SELECT * FROM machines WHERE id = ?", (machine_id,))
@@ -3657,31 +3684,17 @@ def create_app():
                     if sensor_position_id and sensor_position_id in used_positions:
                         flash("Эта позиция уже занята.", "error")
                     else:
-                        db = get_db()
-                        db.execute(
-                            """
-                            INSERT INTO machine_equipment (machine_id, equipment_id, installed_at, sensor_position_id)
-                            VALUES (?, ?, ?, ?)
-                            """,
-                            (machine_id, equipment_id, datetime.now().isoformat(sep=" ", timespec="seconds"), sensor_position_id),
-                        )
-                        db.execute("UPDATE equipment SET status_id = 2 WHERE id = ?", (equipment_id,))
-                        db.commit()
+                        if not _insert_equipment_link(machine_id, equipment_id, sensor_position_id):
+                            flash("Не удалось установить: оборудование или позиция только что заняты.", "error")
+                            return redirect(url_for("machine_detail", machine_id=machine_id))
                         eq_name = (str(eq["name"]).strip() if "name" in eq.keys() and eq["name"] else None) or f"#{equipment_id}"
                         log_operation("install", "equipment", int(equipment_id), f"Установка датчика «{eq_name}» на технику {machine['inventory_number']}")
                         flash("Оборудование установлено.", "success")
                         return redirect(url_for("machine_detail", machine_id=machine_id))
                 else:
-                    db = get_db()
-                    db.execute(
-                        """
-                        INSERT INTO machine_equipment (machine_id, equipment_id, installed_at, sensor_position_id)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (machine_id, equipment_id, datetime.now().isoformat(sep=" ", timespec="seconds"), None),
-                    )
-                    db.execute("UPDATE equipment SET status_id = 2 WHERE id = ?", (equipment_id,))
-                    db.commit()
+                    if not _insert_equipment_link(machine_id, equipment_id, None):
+                        flash("Не удалось установить: оборудование только что установлено на другую технику.", "error")
+                        return redirect(url_for("machine_detail", machine_id=machine_id))
                     eq_name = (str(eq["name"]).strip() if "name" in eq.keys() and eq["name"] else None) or f"#{equipment_id}"
                     log_operation("install", "equipment", int(equipment_id), f"Установка оборудования «{eq_name}» на технику {machine['inventory_number']}")
                     flash("Оборудование установлено.", "success")
@@ -3807,19 +3820,24 @@ def create_app():
                 flash("Эта SIM-карта уже установлена или не числится на складе.", "error")
             else:
                 db = get_db()
-                db.execute(
-                    """
-                    INSERT INTO machine_sim_cards (machine_id, sim_card_id, installed_at)
-                    VALUES (?, ?, ?)
-                    """,
-                    (machine_id, sim_id, datetime.now().isoformat(sep=" ", timespec="seconds")),
-                )
-                # Статус SIM -> Установлена (id=2)
-                db.execute(
-                    "UPDATE sim_cards SET status_id = 2 WHERE id = ?",
-                    (sim_id,),
-                )
-                db.commit()
+                try:
+                    db.execute(
+                        """
+                        INSERT INTO machine_sim_cards (machine_id, sim_card_id, installed_at)
+                        VALUES (?, ?, ?)
+                        """,
+                        (machine_id, sim_id, datetime.now().isoformat(sep=" ", timespec="seconds")),
+                    )
+                    # Статус SIM -> Установлена (id=2)
+                    db.execute(
+                        "UPDATE sim_cards SET status_id = 2 WHERE id = ?",
+                        (sim_id,),
+                    )
+                    db.commit()
+                except sqlite3.IntegrityError:
+                    db.rollback()
+                    flash("Не удалось установить: SIM-карта или техника только что заняты.", "error")
+                    return redirect(url_for("machine_detail", machine_id=machine_id))
                 sim_card = fetch_one("SELECT phone_number FROM sim_cards WHERE id = ?", (sim_id,))
                 phone = (sim_card["phone_number"] if sim_card else "") or f"#{sim_id}"
                 log_operation(

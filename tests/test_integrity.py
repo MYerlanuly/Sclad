@@ -306,10 +306,12 @@ def test_parallel_install_of_same_sim_keeps_single_link(app, seed):
 def test_parallel_install_of_same_equipment_keeps_single_link(app, seed):
     flask_app = make_app()
     flask_app.config["PROPAGATE_EXCEPTIONS"] = False
+    barrier = threading.Barrier(8)
 
     def worker(i):
         c = flask_app.test_client()
         login(c, "admin")
+        barrier.wait()  # все запросы стартуют одновременно
         machine = seed["machine"] if i % 2 == 0 else seed["machine2"]
         c.post(f"/machines/{machine}/install_equipment", data={"equipment_id": seed["equipment"]})
 

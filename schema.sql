@@ -114,6 +114,9 @@ CREATE TABLE IF NOT EXISTS machine_equipment (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_machine_equipment_sensor_position
     ON machine_equipment (machine_id, sensor_position_id)
     WHERE sensor_position_id IS NOT NULL AND removed_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_machine_equipment_active_equipment
+    ON machine_equipment (equipment_id)
+    WHERE removed_at IS NULL;
 
 -- =========================
 -- 6. Operations log
