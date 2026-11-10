@@ -6,10 +6,31 @@ from datetime import date, datetime, timedelta
 
 from flask import Response, render_template, request
 from openpyxl import Workbook
-from openpyxl.styles import Border, Font, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
 from ..db import fetch_all, fetch_one
+from ..report_analytics import DEFAULT_PERIOD, build_report
 from ..utils import fix_mojibake_text, to_int
+
+
+def _polish_sheet(ws):
+    """Единый вид листов выгрузки: шапка, закреплённая строка, автофильтр, ширина колонок."""
+    head_fill = PatternFill("solid", fgColor="0F172A")
+    head_font = Font(bold=True, color="FFFFFF")
+    line = Side(style="thin", color="E2E8F0")
+    for cell in ws[1]:
+        cell.fill = head_fill
+        cell.font = head_font
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+        cell.border = Border(bottom=line)
+    ws.row_dimensions[1].height = 30
+    ws.freeze_panes = "A2"
+    if ws.max_row > 1:
+        ws.auto_filter.ref = ws.dimensions
+    for idx, col in enumerate(ws.iter_cols(min_row=1, max_row=min(ws.max_row, 500)), 1):
+        width = max((len(str(c.value)) for c in col if c.value is not None), default=8)
+        ws.column_dimensions[get_column_letter(idx)].width = max(8, min(48, width + 2))
 
 
 def register(app):
@@ -252,6 +273,8 @@ def register(app):
             ws_mach.cell(row=row_idx, column=2, value=r.get("model_name") or "")
             ws_mach.cell(row=row_idx, column=3, value=r.get("type_name") or "")
 
+        for ws in wb.worksheets:
+            _polish_sheet(ws)
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -265,189 +288,15 @@ def register(app):
     # --- Отчёты и аналитика ---
     @app.route("/reports")
     def reports():
-        """Отчёты и аналитика: сводка по складу, графики, выгрузка по периоду."""
-        # Оборудование по статусам (для круговой диаграммы)
-        equipment_by_status = fetch_all(
-            """
-            SELECT es.name AS status_name, COUNT(e.id) AS cnt
-            FROM equipment e
-            JOIN equipment_statuses es ON e.status_id = es.id
-            GROUP BY e.status_id
-            ORDER BY cnt DESC
-            """
-        )
-        equipment_by_status = [dict(r) for r in equipment_by_status]
-        eq_chart_labels = [r["status_name"] for r in equipment_by_status]
-        eq_chart_data = [r["cnt"] for r in equipment_by_status]
-
-        # ТО по месяцам (последние 12 месяцев)
-        maintenance_by_month = fetch_all(
-            """
-            SELECT strftime('%Y-%m', performed_at) AS month, COUNT(*) AS cnt
-            FROM machine_maintenance
-            WHERE performed_at >= date('now', 'localtime', '-12 months')
-            GROUP BY strftime('%Y-%m', performed_at)
-            ORDER BY month
-            """
-        )
-        month_counts = {r["month"]: r["cnt"] for r in maintenance_by_month}
-        month_names = ("янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек")
-        maint_months = []
-        maint_data = []
-        for i in range(11, -1, -1):
-            d = date.today()
-            month = d.month - i
-            year = d.year
-            while month < 1:
-                month += 12
-                year -= 1
-            m_str = f"{year}-{month:02d}"
-            maint_months.append(f"{month_names[month - 1]} {year}")
-            maint_data.append(month_counts.get(m_str, 0))
-
-        # Сводка по складу: числа для блоков
-        warehouse_summary = {
-            "equipment_total": fetch_one("SELECT COUNT(*) AS c FROM equipment", ())["c"],
-            "equipment_warehouse": fetch_one(
-                "SELECT COUNT(*) AS c FROM equipment WHERE status_id = 1", ()
-            )["c"],
-            "equipment_installed": fetch_one(
-                "SELECT COUNT(*) AS c FROM equipment WHERE status_id = 2",
-                (),
-            )["c"],
-            "equipment_other": fetch_one(
-                "SELECT COUNT(*) AS c FROM equipment WHERE status_id NOT IN (1, 2)", ()
-            )["c"],
-            "machines_total": fetch_one("SELECT COUNT(*) AS c FROM machines", ())["c"],
-            "sim_total": fetch_one("SELECT COUNT(*) AS c FROM sim_cards", ())["c"],
-            "sim_warehouse": fetch_one(
-                "SELECT COUNT(*) AS c FROM sim_cards WHERE status_id = 1", ()
-            )["c"],
-        }
-        # Оборудование по видам (датчики / прочее)
-        equipment_by_kind = fetch_all(
-            """
-            SELECT equipment_kind, COUNT(*) AS cnt
-            FROM equipment
-            GROUP BY equipment_kind
-            """
-        )
-        equipment_by_kind = [dict(r) for r in equipment_by_kind]
-        # Техника по типам
-        machines_by_type = fetch_all(
-            """
-            SELECT mt.name AS type_name, COUNT(m.id) AS cnt
-            FROM machines m
-            JOIN machine_models mm ON m.machine_model_id = mm.id
-            JOIN machine_types mt ON mm.machine_type_id = mt.id
-            GROUP BY mt.id
-            ORDER BY cnt DESC
-            """
-        )
-        machines_by_type = [dict(r) for r in machines_by_type]
-
-        today_iso = date.today().isoformat()
-        date_from_default = (date.today() - timedelta(days=30)).isoformat()
-        date_30_ago = (date.today() - timedelta(days=30)).isoformat()
-        # Задания на смену за последние 30 дней: по статусам
-        shift_tasks_by_status = fetch_all(
-            """
-            SELECT status, COUNT(*) AS cnt
-            FROM shift_tasks
-            WHERE effective_date >= ?
-            GROUP BY status
-            ORDER BY cnt DESC
-            """,
-            (date_30_ago,),
-        )
-        shift_tasks_by_status = [dict(r) for r in shift_tasks_by_status]
-        status_labels_ru = {"pending": "Ожидает", "done": "Выполнено", "not_done": "Не выполнено"}
-        tasks_status_labels = [status_labels_ru.get(r["status"], r["status"]) for r in shift_tasks_by_status]
-        tasks_status_data = [r["cnt"] for r in shift_tasks_by_status]
-        # Задания на смену за последние 30 дней: по типам
-        shift_tasks_by_type = fetch_all(
-            """
-            SELECT tt.name AS type_name, COUNT(st.id) AS cnt
-            FROM shift_tasks st
-            LEFT JOIN shift_task_types tt ON st.task_type_id = tt.id
-            WHERE st.effective_date >= ?
-            GROUP BY st.task_type_id, tt.name
-            ORDER BY cnt DESC
-            """,
-            (date_30_ago,),
-        )
-        shift_tasks_by_type = [dict(r) for r in shift_tasks_by_type]
-        tasks_type_labels = [r["type_name"] or "—" for r in shift_tasks_by_type]
-        tasks_type_data = [r["cnt"] for r in shift_tasks_by_type]
-        # Задания по пользователям за 30 дней: создал / выполнил / отметил не выполнено
-        created_by_user = fetch_all(
-            """
-            SELECT u.id AS user_id, COALESCE(NULLIF(TRIM(u.surname || ' ' || u.first_name), ''), u.username) AS user_name, COUNT(st.id) AS cnt
-            FROM shift_tasks st
-            JOIN users u ON st.created_by_user_id = u.id
-            WHERE st.effective_date >= ?
-            GROUP BY u.id
-            """,
-            (date_30_ago,),
-        )
-        completed_by_user = fetch_all(
-            """
-            SELECT u.id AS user_id, COALESCE(NULLIF(TRIM(u.surname || ' ' || u.first_name), ''), u.username) AS user_name, COUNT(c.id) AS cnt
-            FROM shift_task_completions c
-            JOIN users u ON c.user_id = u.id
-            JOIN shift_tasks st ON c.shift_task_id = st.id
-            WHERE st.effective_date >= ?
-            GROUP BY u.id
-            """,
-            (date_30_ago,),
-        )
-        not_done_by_user = fetch_all(
-            """
-            SELECT u.id AS user_id, COALESCE(NULLIF(TRIM(u.surname || ' ' || u.first_name), ''), u.username) AS user_name, COUNT(st.id) AS cnt
-            FROM shift_tasks st
-            JOIN users u ON st.not_done_by_user_id = u.id
-            WHERE st.effective_date >= ? AND st.status = 'not_done'
-            GROUP BY u.id
-            """,
-            (date_30_ago,),
-        )
-        user_ids = set()
-        for r in created_by_user:
-            user_ids.add(r["user_id"])
-        for r in completed_by_user:
-            user_ids.add(r["user_id"])
-        for r in not_done_by_user:
-            user_ids.add(r["user_id"])
-        created_map = {r["user_id"]: (r["user_name"], r["cnt"]) for r in created_by_user}
-        completed_map = {r["user_id"]: (r["user_name"], r["cnt"]) for r in completed_by_user}
-        not_done_map = {r["user_id"]: (r["user_name"], r["cnt"]) for r in not_done_by_user}
-        tasks_by_user = []
-        for uid in user_ids:
-            name = (created_map.get(uid) or completed_map.get(uid) or not_done_map.get(uid))[0]
-            created = created_map[uid][1] if uid in created_map else 0
-            completed = completed_map[uid][1] if uid in completed_map else 0
-            not_done = not_done_map[uid][1] if uid in not_done_map else 0
-            tasks_by_user.append(
-                {"user_id": uid, "user_name": name, "created": created, "completed": completed, "not_done": not_done}
-            )
-        tasks_by_user.sort(key=lambda x: (x["completed"], x["created"]), reverse=True)
+        """Аналитический отчёт: KPI, динамика, проблемы и рекомендации за выбранный период."""
+        days = to_int(request.args.get("days"), DEFAULT_PERIOD)
+        report = build_report(days)
         return render_template(
             "reports.html",
-            equipment_by_status=equipment_by_status,
-            eq_chart_labels=eq_chart_labels,
-            eq_chart_data=eq_chart_data,
-            maint_chart_labels=maint_months,
-            maint_chart_data=maint_data,
-            warehouse_summary=warehouse_summary,
-            equipment_by_kind=equipment_by_kind,
-            machines_by_type=machines_by_type,
-            date_from_default=date_from_default,
-            date_to_default=today_iso,
-            tasks_status_labels=tasks_status_labels,
-            tasks_status_data=tasks_status_data,
-            tasks_type_labels=tasks_type_labels,
-            tasks_type_data=tasks_type_data,
-            tasks_by_user=tasks_by_user,
+            r=report,
+            generated_at=datetime.now(),
+            date_from_default=report["date_from"],
+            date_to_default=report["date_to"],
         )
 
     @app.route("/reports/export")
