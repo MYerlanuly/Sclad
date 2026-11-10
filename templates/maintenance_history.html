@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}История ТО{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('maintenance_list'), 'Техобслуживание'), (none, 'История ТО')]) }}{% endblock %}
+{% block content %}
+<div class="card mb-6">
+    <div class="card-header">
+        <div class="card-title">Техобслуживание техники</div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('maintenance_calendar') }}" class="btn btn-secondary">Календарь ТО</a>
+            <a href="{{ url_for('maintenance_add') }}" class="btn btn-primary">Записать ТО</a>
+        </div>
+    </div>
+    {% set active_tab = 'history' %}
+    {% include "_maintenance_tabs.html" %}
+
+    <form method="get" action="{{ url_for('maintenance_history') }}" class="filters flex flex-wrap gap-3 items-center text-sm mb-3" id="history-filters">
+        {% if pagination.per_page != 50 %}<input type="hidden" name="per_page" value="{{ pagination.per_page }}">{% endif %}
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Период с:</span>
+            <input type="date" name="date_from" value="{{ filter_date_from }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">по:</span>
+            <input type="date" name="date_to" value="{{ filter_date_to }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Исполнитель:</span>
+            <select name="engineer" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for e in engineers %}
+                <option value="{{ e.label }}" {{ 'selected' if filter_engineer == e.label else '' }}>{{ e.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Тип техники:</span>
+            <select name="type" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for t in machine_types %}
+                <option value="{{ t.id }}" {{ 'selected' if filter_type == t.id else '' }}>{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <input type="search" name="q" value="{{ filter_q }}" placeholder="Инв. номер, модель, замечания" autocomplete="off"
+               class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" style="min-width: 14rem;">
+        <button type="submit" class="btn btn-secondary">Показать</button>
+    </form>
+    <div class="flex flex-wrap items-center gap-2 mb-4 text-sm">
+        <span class="text-slate-500">Быстро:</span>
+        {% for label, p_from, p_to in period_presets %}
+        {% set active = (p_from == filter_date_from and p_to == filter_date_to) %}
+        <a href="{{ url_for('maintenance_history', **dict(filter_args, date_from=p_from, date_to=p_to)) }}"
+           class="px-2.5 py-1 rounded-full border {% if active %}bg-primary-600 border-primary-600 text-white{% else %}border-slate-300 text-slate-700 bg-white hover:bg-slate-100{% endif %}" style="text-decoration: none;">{{ label }}</a>
+        {% endfor %}
+        {% if filter_args %}<a href="{{ url_for('maintenance_history') }}" class="text-slate-500 ml-2">Сбросить фильтры</a>{% endif %}
+        <span class="text-slate-500 ml-auto">Найдено ТО: {{ pagination.total }}</span>
+    </div>
+
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Дата ТО</th>
+                <th>Инв. номер</th>
+                <th>Тип</th>
+                <th>Модель</th>
+                <th>Исполнители</th>
+                <th>Замечания</th>
+                <th>Следующее ТО</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td class="whitespace-nowrap">{{ r.performed_at | datefmt }}</td>
+                <td><a href="{{ url_for('machine_detail', machine_id=r.machine_id) }}">{{ r.inventory_number }}</a></td>
+                <td>{{ r.type_name }}</td>
+                <td>{{ r.model_name }}</td>
+                <td class="text-slate-600 text-sm">{{ r.performed_by or '—' }}</td>
+                <td class="text-slate-600 text-sm" style="max-width: 22rem;">{{ r.remarks or '—' }}</td>
+                <td class="whitespace-nowrap">{{ (r.next_due_at | datefmt) or '—' }}</td>
+                <td><a href="{{ url_for('maintenance_act', maintenance_id=r.id) }}" class="btn btn-secondary" target="_blank" rel="noopener">Акт</a></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="muted">{% if filter_args %}За выбранный период и по фильтрам ТО не найдено.{% else %}ТО ещё не проводилось.{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-2 mb-2">
+        {% if pagination.total_pages > 1 %}
+        <span>Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('maintenance_history', page=1, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">В начало</a>
+        <a href="{{ url_for('maintenance_history', page=pagination.page - 1, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">← Предыдущая</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('maintenance_history', page=pagination.page + 1, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">Следующая →</a>
+        <a href="{{ url_for('maintenance_history', page=pagination.total_pages, per_page=pagination.per_page, **filter_args) }}" class="text-blue-600 hover:underline">В конец</a>
+        {% endif %}
+        {% endif %}
+        <span class="ml-auto">На странице:
+            {% for n in [20, 50, 100, 200] %}
+            <a href="{{ url_for('maintenance_history', per_page=n, page=1, **filter_args) }}" class="{% if pagination.per_page == n %}font-semibold{% endif %}">{{ n }}</a>{% if not loop.last %} <span class="text-slate-400">|</span>{% endif %}
+            {% endfor %}
+        </span>
+    </div>
+</div>
+{% endblock %}

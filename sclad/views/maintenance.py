@@ -6,6 +6,29 @@ from flask import flash, redirect, render_template, request, url_for
 from ..db import fetch_all, fetch_one, get_db, get_setting, log_operation, ref_id
 from ..utils import maintenance_next_due, to_int, to_iso_date
 
+def _engineer_options():
+    """Пользователи для выбора исполнителей ТО: id и подпись «Фамилия Имя» (или логин)."""
+    engineers = []
+    for r in fetch_all("SELECT id, username, surname, first_name FROM users ORDER BY surname, first_name, username"):
+        row = dict(r)
+        full_name = " ".join(
+            part for part in [(row.get("surname") or "").strip(), (row.get("first_name") or "").strip()] if part
+        ).strip()
+        engineers.append({"id": row["id"], "label": full_name or row.get("username")})
+    return engineers
+
+
+def _history_period_presets(today):
+    """Быстрые кнопки периода для истории ТО: (название, с, по). Пустые даты — за всё время."""
+    return [
+        ("Этот месяц", today.replace(day=1).isoformat(), today.isoformat()),
+        ("30 дней", (today - timedelta(days=29)).isoformat(), today.isoformat()),
+        ("90 дней", (today - timedelta(days=89)).isoformat(), today.isoformat()),
+        ("Этот год", today.replace(month=1, day=1).isoformat(), today.isoformat()),
+        ("Все", "", ""),
+    ]
+
+
 MAINTENANCE_STATUS_LABELS = {
     "overdue": "Просрочено",
     "due_soon": "Скоро ТО",
@@ -108,6 +131,82 @@ def register(app):
             status_counts=status_counts,
             total_all=total_all,
             maintenance_interval_months=get_setting("maintenance_interval_months", "3"),
+        )
+
+    @app.route("/maintenance/history")
+    def maintenance_history():
+        """История ТО: все проведённые ТО с фильтрами по периоду, исполнителю, типу и поиском."""
+        try:
+            per_page = max(1, min(500, int(request.args.get("per_page", 50) or 50)))
+        except (TypeError, ValueError):
+            per_page = 50
+        page = max(1, min(100000, to_int(request.args.get("page"), 1) or 1))
+        filter_date_from = to_iso_date(request.args.get("date_from")) or ""
+        filter_date_to = to_iso_date(request.args.get("date_to")) or ""
+        if filter_date_from and filter_date_to and filter_date_from > filter_date_to:
+            filter_date_from, filter_date_to = filter_date_to, filter_date_from
+        type_id = to_int(request.args.get("type"))
+        filter_q = (request.args.get("q") or "").strip()[:100]
+        filter_engineer = (request.args.get("engineer") or "").strip()[:100]
+
+        where, params = [], []
+        if filter_date_from:
+            where.append("substr(mnt.performed_at, 1, 10) >= ?")
+            params.append(filter_date_from)
+        if filter_date_to:
+            where.append("substr(mnt.performed_at, 1, 10) <= ?")
+            params.append(filter_date_to)
+        if type_id is not None:
+            where.append("mt.id = ?")
+            params.append(type_id)
+        if filter_q:
+            like = f"%{filter_q.casefold()}%"
+            where.append("(CASEFOLD(m.inventory_number) LIKE ? OR CASEFOLD(mm.name) LIKE ? OR CASEFOLD(COALESCE(mnt.remarks, '')) LIKE ?)")
+            params.extend([like, like, like])
+        if filter_engineer:
+            where.append("CASEFOLD(COALESCE(mnt.performed_by, '')) LIKE ?")
+            params.append(f"%{filter_engineer.casefold()}%")
+        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        from_sql = """
+            FROM machine_maintenance mnt
+            JOIN machines m ON mnt.machine_id = m.id
+            JOIN machine_models mm ON m.machine_model_id = mm.id
+            JOIN machine_types mt ON mm.machine_type_id = mt.id
+        """
+        total = fetch_one(f"SELECT COUNT(*) AS c {from_sql}{where_sql}", tuple(params))["c"]
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        records = [
+            dict(r)
+            for r in fetch_all(
+                f"""
+                SELECT mnt.id, mnt.machine_id, mnt.performed_at, mnt.next_due_at, mnt.performed_by, mnt.remarks,
+                       m.inventory_number, mm.name AS model_name, mt.name AS type_name
+                {from_sql}{where_sql}
+                ORDER BY mnt.performed_at DESC, mnt.id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (*params, per_page, (page - 1) * per_page),
+            )
+        ]
+        filter_args = {}
+        for key, val in (("date_from", filter_date_from), ("date_to", filter_date_to), ("q", filter_q),
+                         ("engineer", filter_engineer), ("type", type_id)):
+            if val not in (None, ""):
+                filter_args[key] = val
+        return render_template(
+            "maintenance_history.html",
+            records=records,
+            machine_types=[dict(r) for r in fetch_all("SELECT id, name FROM machine_types ORDER BY name")],
+            engineers=_engineer_options(),
+            pagination={"page": page, "per_page": per_page, "total": total, "total_pages": total_pages},
+            filter_date_from=filter_date_from,
+            filter_date_to=filter_date_to,
+            filter_type=type_id,
+            filter_q=filter_q,
+            filter_engineer=filter_engineer,
+            filter_args=filter_args,
+            period_presets=_history_period_presets(date.today()),
         )
 
     @app.route("/maintenance/calendar")
@@ -245,18 +344,7 @@ def register(app):
             "JOIN machine_models mm ON m.machine_model_id = mm.id ORDER BY m.inventory_number"
         )
         machines = [dict(r) for r in machines]
-        # Список пользователей для выбора исполнителей ТО
-        engineers_rows = fetch_all(
-            "SELECT id, username, surname, first_name FROM users ORDER BY surname, first_name, username"
-        )
-        engineers = []
-        for r in engineers_rows:
-            row = dict(r)
-            full_name = " ".join(
-                part for part in [(row.get("surname") or "").strip(), (row.get("first_name") or "").strip()] if part
-            ).strip()
-            label = full_name or row.get("username")
-            engineers.append({"id": row["id"], "label": label})
+        engineers = _engineer_options()
         today_str = date.today().isoformat()
         if request.method == "POST":
             mid = ref_id("machines", request.form.get("machine_id") or machine_id)
