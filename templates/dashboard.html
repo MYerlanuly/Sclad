@@ -1,246 +1,248 @@
 {% extends "base.html" %}
 {% block title %}Главная{% endblock %}
-{% block breadcrumbs %}{{ breadcrumb([(none, 'Главная')]) }}{% endblock %}
 {% block content %}
-<section class="mb-6">
-    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <h2 class="text-xl font-semibold text-slate-800 m-0">Сводка</h2>
-        <div class="flex flex-wrap items-center gap-3">
-            <span id="dashboard-clock" class="text-sm text-slate-500 tabular-nums font-medium" aria-hidden="true"></span>
-            <a href="{{ url_for('export_inventory_excel') }}" class="text-sm text-slate-600 hover:text-slate-800 no-underline border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors">Скачать отчёт Excel</a>
-            {% if current_user.is_admin %}<a href="{{ url_for('backup_db') }}" class="text-sm text-slate-500 hover:text-slate-700 no-underline border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-colors">Резервная копия БД</a>{% endif %}
-            {% if last_backup_at %}<span class="text-slate-400 text-xs">Последняя копия: {{ last_backup_at }}</span>{% endif %}
-        </div>
-    </div>
-    <div class="filters mb-6">
-        <span class="text-slate-600 font-medium text-sm mr-2">Быстрые действия:</span>
-        <a href="{{ url_for('machine_add') }}" class="btn btn-primary">Добавить технику</a>
-        <a href="{{ url_for('equipment_add') }}" class="btn btn-secondary">Добавить оборудование</a>
-        <a href="{{ url_for('maintenance_add') }}" class="btn btn-secondary">Записать ТО</a>
-        <a href="{{ url_for('sim_card_add') }}" class="btn btn-secondary">Добавить SIM</a>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 stagger-children">
-        <a href="{{ url_for('machines_list') }}" class="group block no-underline text-slate-800 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:border-blue-200 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
-            <div class="h-1 w-full bg-gradient-to-r from-blue-500 to-blue-600"></div>
-            <div class="p-5">
-                <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Техника</p>
-                <p class="text-3xl font-bold text-slate-800 mt-1 tabular-nums">{{ machines_total }}</p>
-                <div class="flex flex-wrap gap-2 mt-3">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">с оборудованием {{ machines_with_equipment }}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">с SIM {{ machines_with_sim }}</span>
-                </div>
-            </div>
-        </a>
-        <a href="{{ url_for('equipment_list') }}" class="group block no-underline text-slate-800 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:border-emerald-200 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
-            <div class="h-1 w-full bg-gradient-to-r from-emerald-500 to-emerald-600"></div>
-            <div class="p-5">
-                <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Оборудование</p>
-                <p class="text-3xl font-bold text-slate-800 mt-1 tabular-nums">{{ equipment_total }}</p>
-                <div class="flex flex-wrap gap-2 mt-3">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700">склад {{ equipment_warehouse }}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">установлено {{ equipment_installed }}</span>
-                </div>
-            </div>
-        </a>
-        <a href="{{ url_for('sim_cards_list') }}" class="group block no-underline text-slate-800 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:border-violet-200 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
-            <div class="h-1 w-full bg-gradient-to-r from-violet-500 to-violet-600"></div>
-            <div class="p-5">
-                <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">SIM-карты</p>
-                <p class="text-3xl font-bold text-slate-800 mt-1 tabular-nums">{{ sim_total }}</p>
-                <div class="flex flex-wrap gap-2 mt-3">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700">склад {{ sim_warehouse }}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">установлено {{ sim_installed }}</span>
-                </div>
-            </div>
-        </a>
-        <a href="{{ url_for('operations_list') }}" class="group block no-underline text-slate-800 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:border-slate-300 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
-            <div class="h-1 w-full bg-gradient-to-r from-slate-500 to-slate-600"></div>
-            <div class="p-5">
-                <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Операции</p>
-                <p class="text-3xl font-bold text-slate-800 mt-1 tabular-nums">{{ ops_today }}</p>
-                <p class="text-xs text-slate-500 mt-3">сегодня · за 7 дней {{ ops_week }}</p>
-            </div>
-        </a>
-    </div>
-</section>
+{# Плитка «требует внимания»: число, подпись, ссылка в отфильтрованный список. tone — цвет, когда число больше нуля #}
+{% macro alert_tile(value, label, href, tone, hint='') %}
+{% set active = value and value > 0 %}
+<a href="{{ href }}" class="dash-tile {% if active %}dash-tile-{{ tone }}{% else %}dash-tile-quiet{% endif %}"{% if hint %} title="{{ hint }}"{% endif %}>
+    <span class="dash-tile-value tabular-nums">{{ value }}</span>
+    <span class="dash-tile-label">{{ label }}</span>
+</a>
+{% endmacro %}
+{% macro task_status(status) %}
+{% if status == 'done' %}<span class="dash-pill dash-pill-green">Выполнено</span>
+{% elif status == 'not_done' %}<span class="dash-pill dash-pill-red">Не выполнено</span>
+{% else %}<span class="dash-pill dash-pill-amber">Ожидает</span>{% endif %}
+{% endmacro %}
 
-{% if maintenance_overdue > 0 or maintenance_due_soon > 0 %}
-<section class="mb-8 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/30 p-5 shadow-sm">
-    <div class="flex flex-wrap items-center justify-between gap-4">
+<style>
+    .dash-tile { display: flex; flex-direction: column; gap: 0.125rem; padding: 0.875rem 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; background: #fff; text-decoration: none; transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+    .dash-tile:hover { box-shadow: 0 4px 12px rgb(0 0 0 / 0.06); transform: translateY(-1px); }
+    .dash-tile-value { font-size: 1.75rem; line-height: 1.1; font-weight: 700; }
+    .dash-tile-label { font-size: 0.8125rem; font-weight: 500; }
+    .dash-tile-quiet .dash-tile-value { color: #94a3b8; }
+    .dash-tile-quiet .dash-tile-label { color: #64748b; }
+    .dash-tile-red { background: #fef2f2; border-color: #fecaca; }
+    .dash-tile-red .dash-tile-value { color: #dc2626; } .dash-tile-red .dash-tile-label { color: #991b1b; }
+    .dash-tile-amber { background: #fffbeb; border-color: #fde68a; }
+    .dash-tile-amber .dash-tile-value { color: #d97706; } .dash-tile-amber .dash-tile-label { color: #92400e; }
+    .dash-tile-blue { background: #eff6ff; border-color: #bfdbfe; }
+    .dash-tile-blue .dash-tile-value { color: #2563eb; } .dash-tile-blue .dash-tile-label { color: #1e40af; }
+    .dash-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+    .dash-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.875rem 1.125rem; border-bottom: 1px solid #f1f5f9; }
+    .dash-panel-title { font-size: 1rem; font-weight: 600; color: #1e293b; margin: 0; }
+    .dash-panel-link { font-size: 0.8125rem; color: #2563eb; text-decoration: none; white-space: nowrap; }
+    .dash-panel-link:hover { text-decoration: underline; }
+    .dash-list { list-style: none; margin: 0; padding: 0; }
+    .dash-list > li { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.125rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+    .dash-list > li:last-child { border-bottom: none; }
+    .dash-list a { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .dash-list a:hover { text-decoration: underline; }
+    .dash-pill { display: inline-flex; align-items: center; padding: 0.0625rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+    .dash-pill-green { background: #dcfce7; color: #166534; }
+    .dash-pill-red { background: #fee2e2; color: #991b1b; }
+    .dash-pill-amber { background: #fef3c7; color: #92400e; }
+    .dash-pill-blue { background: #dbeafe; color: #1e40af; }
+    .dash-pill-slate { background: #f1f5f9; color: #475569; }
+    .dash-stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 1.125rem; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: inherit; }
+    .dash-stat-row:last-child { border-bottom: none; }
+    .dash-stat-row:hover { background: #f8fafc; }
+    .dash-search { width: 100%; padding: 0.5rem 0.875rem; font-size: 0.9375rem; border: 1px solid #cbd5e1; border-radius: 0.625rem; background: #fff; }
+    .dash-search:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15); }
+    .dash-action { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500; text-decoration: none; border: 1px solid #e2e8f0; background: #fff; color: #334155; transition: border-color 0.15s ease, background 0.15s ease; }
+    .dash-action:hover { border-color: #93c5fd; background: #eff6ff; color: #1e40af; }
+    .dash-done-btn { display: inline-flex; align-items: center; padding: 0.25rem 0.625rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px solid #86efac; color: #15803d !important; background: #fff; text-decoration: none !important; }
+    .dash-done-btn:hover { background: #f0fdf4; border-color: #22c55e; }
+    .dash-action-plus { font-weight: 700; color: #2563eb; }
+</style>
+
+{# ---------- Шапка: смена, поиск, действия ---------- #}
+<section class="mb-5">
+    <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-            <h3 class="text-base font-semibold text-amber-900 m-0">ТО: требует внимания</h3>
-            <p class="text-sm text-amber-800/80 mt-1">Техника с просроченным или приближающимся сроком техобслуживания.</p>
+            <p class="text-sm text-slate-500 m-0">Сейчас</p>
+            <h2 class="text-2xl font-semibold text-slate-800 m-0">{{ shift_title }}</h2>
+            <p class="text-xs text-slate-500 mt-1 mb-0">{% if cur_shift == 'day' %}08:30 – 20:30{% else %}20:30 – 08:30{% endif %}</p>
         </div>
-        <a href="{{ url_for('maintenance_list') }}" class="btn btn-primary shrink-0">К списку ТО</a>
+        <form action="{{ url_for('quick_search') }}" method="get" role="search" class="w-full sm:w-96">
+            <input type="search" name="q" class="dash-search" placeholder="Найти: инв. № техники или серийный номер" aria-label="Поиск по инв. номеру или серийному номеру">
+        </form>
     </div>
-    <div class="flex flex-wrap gap-6 mt-4">
-        {% if maintenance_overdue > 0 %}
-        <div class="flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-red-600 tabular-nums">{{ maintenance_overdue }}</span>
-            <span class="text-sm font-medium text-red-700">просрочено</span>
-        </div>
+    {% if can_edit or can_work_shift %}
+    <div class="flex flex-wrap gap-2 mt-4">
+        {% if can_work_shift %}
+        <a href="{{ url_for('shift_tasks_list') }}#add" class="dash-action"><span class="dash-action-plus">+</span> Задание на смену</a>
+        <a href="{{ url_for('journal') }}" class="dash-action"><span class="dash-action-plus">+</span> Запись в журнал</a>
+        <a href="{{ url_for('maintenance_add') }}" class="dash-action"><span class="dash-action-plus">+</span> Записать ТО</a>
         {% endif %}
-        {% if maintenance_due_soon > 0 %}
-        <div class="flex items-baseline gap-2">
-            <span class="text-2xl font-bold text-amber-600 tabular-nums">{{ maintenance_due_soon }}</span>
-            <span class="text-sm font-medium text-amber-700">скоро ТО (14 дней)</span>
-        </div>
+        {% if can_edit %}
+        <a href="{{ url_for('equipment_add') }}" class="dash-action"><span class="dash-action-plus">+</span> Оборудование</a>
+        <a href="{{ url_for('machine_add') }}" class="dash-action"><span class="dash-action-plus">+</span> Техника</a>
+        <a href="{{ url_for('sim_card_add') }}" class="dash-action"><span class="dash-action-plus">+</span> SIM-карта</a>
         {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+{# ---------- Требует внимания ---------- #}
+<section class="mb-6" aria-label="Требует внимания">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        {{ alert_tile(shift_counts.pending, 'заданий ждут в эту смену', url_for('shift_tasks_list', date=cur_date, shift=cur_shift, status='pending'), 'blue') }}
+        {{ alert_tile(open_past, 'не закрыто с прошлых смен', url_for('shift_tasks_list'), 'amber', 'Не выполненные и не перенесённые задания прошлых смен') }}
+        {{ alert_tile(maintenance_counts.overdue, 'техника с просроченным ТО', url_for('maintenance_list', status='overdue'), 'red') }}
+        {{ alert_tile(maintenance_counts.due_soon, 'ТО в ближайшие 14 дней', url_for('maintenance_list', status='due_soon'), 'amber') }}
+        {{ alert_tile(inv.equipment_broken, 'неисправное оборудование', url_for('equipment_list', status=4), 'red') }}
     </div>
 </section>
-{% endif %}
 
-{% if maintenance_upcoming %}
-<div class="card mb-8">
-    <div class="card-header">
-        <div class="card-title">Ближайшие ТО</div>
-        <a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary">Весь список ТО</a>
-    </div>
-    <div class="table-wrap">
-    <table>
-        <thead>
-            <tr>
-                <th>Инв. номер</th>
-                <th>Модель</th>
-                <th>Следующее ТО</th>
-                <th>Статус</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in maintenance_upcoming %}
-            <tr>
-                <td><a href="{{ url_for('machine_detail', machine_id=m.id) }}">{{ m.inventory_number }}</a></td>
-                <td>{{ m.model_name }}</td>
-                <td>{{ m.next_due_at | datefmt }}</td>
-                <td>
-                    {% if m.to_status == 'overdue' %}
-                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Просрочено</span>
-                    {% elif m.to_status == 'due_soon' %}
-                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Скоро</span>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    {# ---------- Левая колонка: смена ---------- #}
+    <div class="lg:col-span-2 flex flex-col gap-5">
+        <section class="dash-panel">
+            <div class="dash-panel-head">
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h3 class="dash-panel-title">Задания текущей смены</h3>
+                    <span class="text-xs text-slate-500">
+                        выполнено {{ shift_counts.done }} из {{ shift_counts.pending + shift_counts.done + shift_counts.not_done }}{% if shift_counts.not_done %} · не выполнено {{ shift_counts.not_done }}{% endif %}
+                    </span>
+                </div>
+                <a href="{{ url_for('shift_tasks_list', date=cur_date, shift=cur_shift) }}" class="dash-panel-link">Все задания смены →</a>
+            </div>
+            {% if shift_tasks %}
+            <ul class="dash-list">
+                {% for t in shift_tasks %}
+                <li>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-slate-800 {% if t.status == 'done' %}line-through decoration-slate-300 text-slate-500{% endif %} truncate">{{ t.title }}</div>
+                        <div class="text-xs text-slate-500 mt-0.5 flex flex-wrap gap-x-2">
+                            {% if t.task_type_name %}<span>{{ t.task_type_name }}</span>{% endif %}
+                            {% if t.machine_inventory_number %}<span>· <a href="{{ url_for('machine_detail', machine_id=t.machine_id) }}">{{ t.machine_inventory_number }}</a></span>{% endif %}
+                            {% if t.status == 'not_done' and t.not_done_reason %}<span class="text-red-700">· {{ t.not_done_reason }}</span>{% endif %}
+                        </div>
+                    </div>
+                    {% if t.status == 'pending' and can_work_shift %}
+                    <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="dash-done-btn shrink-0" title="Отметить выполнение">✓ Отметить</a>
                     {% else %}
-                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Норма</span>
+                    {{ task_status(t.status) }}
                     {% endif %}
-                </td>
-                <td><a href="{{ url_for('maintenance_add', machine_id=m.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Записать ТО</a></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
-</div>
-{% endif %}
-
-<section class="mb-8">
-    <a href="{{ url_for('shift_tasks_list') }}" class="block no-underline text-slate-800">
-    <div class="card border-t-4 border-t-cyan-500">
-        <div class="card-header">
-            <div class="card-title">Задания на смену · сегодня</div>
-            <span class="text-sm text-slate-500">К списку заданий →</span>
-        </div>
-        <div class="flex flex-wrap gap-6 mb-4">
-            <div class="flex items-baseline gap-2">
-                <span class="text-2xl font-bold text-amber-600 tabular-nums">{{ shift_tasks_today_pending }}</span>
-                <span class="text-sm font-medium text-slate-600">ожидает</span>
-            </div>
-            <div class="flex items-baseline gap-2">
-                <span class="text-2xl font-bold text-emerald-600 tabular-nums">{{ shift_tasks_today_done }}</span>
-                <span class="text-sm font-medium text-slate-600">выполнено</span>
-            </div>
-            <div class="flex items-baseline gap-2">
-                <span class="text-2xl font-bold text-red-600 tabular-nums">{{ shift_tasks_today_not_done }}</span>
-                <span class="text-sm font-medium text-slate-600">не выполнено</span>
-            </div>
-        </div>
-        {% if shift_tasks_today_list %}
-        <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Смена</th>
-                    <th>Тип</th>
-                    <th>Задание</th>
-                    <th>Статус</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for t in shift_tasks_today_list %}
-                <tr>
-                    <td>{% if t.for_shift == 'day' %}1-я{% else %}2-я{% endif %}</td>
-                    <td><span class="badge">{{ t.task_type_name or '—' }}</span></td>
-                    <td><a href="{{ url_for('shift_tasks_list', date=t.effective_date) }}" class="text-inherit hover:underline">{{ t.title }}</a></td>
-                    <td>
-                        {% if t.status == 'done' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Выполнено</span>
-                        {% elif t.status == 'not_done' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Не выполнено</span>
-                        {% else %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Ожидает</span>{% endif %}
-                    </td>
-                </tr>
+                </li>
                 {% endfor %}
-            </tbody>
-        </table>
-        </div>
-        {% else %}
-        <p class="text-slate-500 text-sm mb-0">Заданий на сегодня нет.</p>
-        {% endif %}
-    </div>
-    </a>
-</section>
-
-<div class="card mt-6">
-    <div class="card-header">
-        <div class="card-title">Последние операции</div>
-        <a href="{{ url_for('operations_list') }}" class="btn btn-secondary">Весь журнал</a>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>Дата</th>
-                <th>Сущность</th>
-                <th>Операция</th>
-                <th>Описание</th>
-                <th>Кто</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for op in recent_ops %}
-            <tr>
-                <td>{{ op.created_at | datefmt }}</td>
-                <td>
-                    {% if op.entity_type == 'machine' %}
-                    <a href="{{ url_for('machine_detail', machine_id=op.entity_id) }}">Техника #{{ op.entity_id }}</a>
-                    {% elif op.entity_type == 'equipment' %}
-                    <a href="{{ url_for('equipment_detail', equipment_id=op.entity_id) }}">Оборудование #{{ op.entity_id }}</a>
-                    {% elif op.entity_type == 'sim_card' %}
-                    <a href="{{ url_for('sim_card_detail', sim_id=op.entity_id) }}">SIM #{{ op.entity_id }}</a>
-                    {% else %}
-                    {{ op.entity_type }} #{{ op.entity_id }}
-                    {% endif %}
-                </td>
-                <td>{{ op.operation_type }}</td>
-                <td>{{ op.description or '—' }}</td>
-                <td class="text-slate-600">{{ op.username or '—' }}</td>
-            </tr>
+            </ul>
+            {% if shift_tasks_more %}
+            <div class="px-4 py-2 text-xs text-slate-500 border-t border-slate-100">
+                И ещё {{ shift_tasks_more }} — <a href="{{ url_for('shift_tasks_list', date=cur_date, shift=cur_shift) }}" class="text-blue-600 no-underline hover:underline">открыть список</a>
+            </div>
+            {% endif %}
             {% else %}
-            <tr>
-                <td colspan="5" class="muted">Операций пока нет.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            <p class="px-4 py-6 text-sm text-slate-500 m-0 text-center">
+                На эту смену заданий нет.
+                {% if can_work_shift %}<a href="{{ url_for('shift_tasks_list') }}#add" class="text-blue-600 no-underline hover:underline">Добавить задание</a>{% endif %}
+            </p>
+            {% endif %}
+        </section>
+
+        <section class="dash-panel">
+            <div class="dash-panel-head">
+                <h3 class="dash-panel-title">Журнал смены</h3>
+                <a href="{{ url_for('journal') }}" class="dash-panel-link">Открыть журнал →</a>
+            </div>
+            <div class="px-4 py-3 text-sm flex flex-wrap gap-x-8 gap-y-2">
+                <div>
+                    <span class="text-slate-500">На смене:</span>
+                    {% if journal.engineers %}<span class="text-slate-800 font-medium">{{ journal.engineers }}</span>
+                    {% else %}<span class="text-slate-400">никто не отмечен</span>{% endif %}
+                </div>
+                <div>
+                    <span class="text-slate-500">Записей:</span>
+                    <span class="text-slate-800 font-medium tabular-nums">{{ journal.entries }}</span>
+                </div>
+            </div>
+        </section>
+        {# ---------- Последние операции ---------- #}
+        <section class="dash-panel">
+            <div class="dash-panel-head">
+                <h3 class="dash-panel-title">Последние операции</h3>
+                <a href="{{ url_for('operations_list') }}" class="dash-panel-link">Весь журнал операций →</a>
+            </div>
+            {% if recent_ops %}
+            <ul class="dash-list">
+                {% for op in recent_ops %}
+                <li class="items-start">
+                    <span class="dash-pill dash-pill-{{ op.tone }} shrink-0 justify-center w-24 mt-0.5">{{ op.operation_label }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-slate-700">{% if op.url %}<a href="{{ op.url }}">{{ op.entity_label }}</a>{% else %}<span class="text-slate-500">{{ op.entity_label }}</span>{% endif %}{% if op.description %}: {{ op.description }}{% endif %}</div>
+                        <div class="text-xs text-slate-400 mt-0.5 tabular-nums">{{ op.when }}{% if op.username %} · {{ op.username }}{% endif %}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="px-4 py-6 text-sm text-slate-500 m-0 text-center">Операций пока нет.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    {# ---------- Правая колонка: ТО и склад ---------- #}
+    <div class="flex flex-col gap-5">
+        <section class="dash-panel">
+            <div class="dash-panel-head">
+                <h3 class="dash-panel-title">Нужно ТО</h3>
+                <a href="{{ url_for('maintenance_list') }}" class="dash-panel-link">Список ТО →</a>
+            </div>
+            {% if maintenance_rows %}
+            <ul class="dash-list">
+                {% for m in maintenance_rows %}
+                <li>
+                    <div class="flex-1 min-w-0">
+                        <a href="{{ url_for('machine_detail', machine_id=m.id) }}">{{ m.inventory_number }}</a>
+                        <span class="text-xs text-slate-500 ml-1">{{ m.model_name }}</span>
+                    </div>
+                    {% if m.to_status == 'overdue' %}
+                    <span class="dash-pill dash-pill-red" title="Срок ТО: {{ m.next_due_at | datefmt }}">просрочено {{ -m.days_left }} дн.</span>
+                    {% elif m.days_left == 0 %}
+                    <span class="dash-pill dash-pill-amber" title="Срок ТО: {{ m.next_due_at | datefmt }}">сегодня</span>
+                    {% else %}
+                    <span class="dash-pill dash-pill-amber" title="Срок ТО: {{ m.next_due_at | datefmt }}">через {{ m.days_left }} дн.</span>
+                    {% endif %}
+                    {% if can_work_shift %}<a href="{{ url_for('maintenance_add', machine_id=m.id) }}" class="text-xs shrink-0" title="Записать ТО">+ ТО</a>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% set to_more = maintenance_counts.overdue + maintenance_counts.due_soon - maintenance_rows|length %}
+            {% if to_more > 0 %}
+            <div class="px-4 py-2 text-xs text-slate-500 border-t border-slate-100">
+                И ещё {{ to_more }} — <a href="{{ url_for('maintenance_list', status='overdue' if maintenance_counts.overdue else 'due_soon') }}" class="text-blue-600 no-underline hover:underline">весь список</a>
+            </div>
+            {% endif %}
+            {% else %}
+            <p class="px-4 py-6 text-sm text-slate-500 m-0 text-center">Просроченных и близких ТО нет.</p>
+            {% endif %}
+        </section>
+
+        <section class="dash-panel">
+            <div class="dash-panel-head">
+                <h3 class="dash-panel-title">Склад</h3>
+                <a href="{{ url_for('export_inventory_excel') }}" class="dash-panel-link" title="Полная выгрузка в Excel">Excel ↓</a>
+            </div>
+            <a href="{{ url_for('equipment_list') }}" class="dash-stat-row">
+                <span class="text-sm text-slate-700">Оборудование <span class="font-semibold text-slate-900 tabular-nums">{{ inv.equipment_total }}</span></span>
+                <span class="text-xs text-slate-500 text-right">на складе <b class="text-emerald-700 tabular-nums">{{ inv.equipment_warehouse }}</b> · установлено <b class="tabular-nums">{{ inv.equipment_installed }}</b></span>
+            </a>
+            <a href="{{ url_for('sim_cards_list') }}" class="dash-stat-row">
+                <span class="text-sm text-slate-700">SIM-карты <span class="font-semibold text-slate-900 tabular-nums">{{ inv.sim_total }}</span></span>
+                <span class="text-xs text-slate-500 text-right">на складе <b class="text-emerald-700 tabular-nums">{{ inv.sim_warehouse }}</b> · установлено <b class="tabular-nums">{{ inv.sim_installed }}</b>{% if inv.sim_blocked %} · забл. <b class="text-red-700 tabular-nums">{{ inv.sim_blocked }}</b>{% endif %}</span>
+            </a>
+            <a href="{{ url_for('machines_list') }}" class="dash-stat-row">
+                <span class="text-sm text-slate-700">Техника <span class="font-semibold text-slate-900 tabular-nums">{{ inv.machines_total }}</span></span>
+                <span class="text-xs text-slate-500 text-right">с оборуд. <b class="tabular-nums">{{ inv.machines_with_equipment }}</b> · с SIM <b class="tabular-nums">{{ inv.machines_with_sim }}</b></span>
+            </a>
+        </section>
+    </div>
 </div>
-<script>
-(function(){
-    var el = document.getElementById('dashboard-clock');
-    if (!el) return;
-    var months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-    function tick(){
-        var d = new Date();
-        var t = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
-        var date = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-        el.textContent = t + ' · ' + date;
-    }
-    tick();
-    setInterval(tick, 1000);
-})();
-</script>
+
+
+<p class="text-xs text-slate-400 mt-4 flex flex-wrap gap-x-4 gap-y-1">
+    {% if last_backup_at %}<span>Последняя резервная копия: {{ last_backup_at }}</span>{% endif %}
+    {% if current_user.is_admin %}<a href="{{ url_for('backup_db') }}" class="text-slate-500 no-underline hover:underline">Скачать копию базы</a>{% endif %}
+</p>
 {% endblock %}
