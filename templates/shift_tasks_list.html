@@ -177,10 +177,11 @@
             </div>
 
             <div class="grid gap-3 mt-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
-                <div class="combo" id="machine_combo">
+                {% set am_label = (add_machine.inventory_number ~ (' — ' ~ add_machine.model_name if add_machine.model_name else '') ~ (' (' ~ add_machine.type_name ~ ')' if add_machine.type_name else '')) if add_machine else '' %}
+                <div class="combo{% if add_machine %} selected{% endif %}" id="machine_combo">
                     <label for="machine_search" class="block text-slate-600 text-sm mb-1">Техника <span class="text-slate-400">(необязательно)</span></label>
-                    <input type="hidden" name="machine_id" value="">
-                    <input type="text" id="machine_search" placeholder="Инв. № или модель…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+                    <input type="hidden" name="machine_id" value="{{ add_machine.id if add_machine else '' }}">
+                    <input type="text" id="machine_search" value="{{ am_label }}" placeholder="Инв. № или модель…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
                     <ul class="combo-list" hidden></ul>
                 </div>
                 <div class="combo" id="equipment_combo">
@@ -349,7 +350,8 @@
     // Форма свёрнута по умолчанию; браузер запоминает, если её раскрыли
     try { if (localStorage.getItem('shiftTasksAddOpen') === '1') block.open = true; } catch (e) {}
     // Ссылка «+ Задание на смену» с главной открывает форму сразу
-    if (location.hash === '#add') { block.open = true; block.scrollIntoView({ block: 'start' }); }
+    // С карточки борта (?machine=…) — тоже, техника уже выбрана
+    if (location.hash === '#add' || {{ 'true' if add_machine else 'false' }}) { block.open = true; block.scrollIntoView({ block: 'start' }); document.getElementById('title').focus(); }
     block.addEventListener('toggle', function() {
         try { localStorage.setItem('shiftTasksAddOpen', block.open ? '1' : '0'); } catch (e) {}
         if (block.open) document.getElementById('title').focus();

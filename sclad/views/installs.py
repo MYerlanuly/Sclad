@@ -52,6 +52,11 @@ def register(app):
             "NOT EXISTS (SELECT 1 FROM machine_equipment me WHERE me.equipment_id = e.id AND me.removed_at IS NULL)",
         ]
         params = []
+        # ?position=<id> — «+ Установить» на пустом колесе в карточке борта: показываем только датчики
+        # и сразу выбираем эту позицию (если она свободна)
+        preselect_position = to_int(request.args.get("position"))
+        if preselect_position:
+            where_sql.append("e.equipment_kind = 'sensor'")
         if q:
             where_sql.append(
                 "(e.name LIKE ? OR e.serial_number LIKE ? OR IFNULL(e.description, '') LIKE ?)"
@@ -146,6 +151,8 @@ def register(app):
             equipment_list=free_equipment,
             positions=positions,
             used_positions=used_positions,
+            preselect_position=preselect_position if preselect_position not in used_positions else None,
+            preselect_position_code=next((p["code"] for p in positions if p["id"] == preselect_position), None),
             pagination=pagination,
         )
 

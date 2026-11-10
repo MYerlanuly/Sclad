@@ -3,7 +3,7 @@
 {% block content %}
 <div class="card">
     <div class="card-header">
-        <div class="card-title">Установка оборудования на технику {{ machine.inventory_number }}</div>
+        <div class="card-title">{% if preselect_position_code %}Установка датчика на позицию {{ preselect_position_code }}, борт{% else %}Установка оборудования на технику{% endif %} {{ machine.inventory_number }}</div>
         <div>
             <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">← Назад к технике</a>
         </div>
@@ -18,9 +18,10 @@
             {% if pagination %}
             <input type="hidden" name="per_page" value="{{ pagination.per_page }}">
             {% endif %}
+            {% if request.args.get('position') %}<input type="hidden" name="position" value="{{ request.args.get('position') }}">{% endif %}
             <button type="submit" class="btn btn-secondary">Найти</button>
             {% if request.args.get('q') %}
-            <a href="{{ url_for('install_equipment', machine_id=machine.id) }}" class="btn btn-secondary">Сбросить поиск</a>
+            <a href="{{ url_for('install_equipment', machine_id=machine.id, position=request.args.get('position')) }}" class="btn btn-secondary">Сбросить поиск</a>
             {% endif %}
         </div>
     </form>
@@ -41,14 +42,14 @@
                             <optgroup label="Колёса">
                                 {% for p in positions %}
                                     {% if p.get('position_group', 'wheel') == 'wheel' %}
-                                    <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% endif %}>{{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}</option>
+                                    <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% elif p.id == preselect_position %}selected{% endif %}>{{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}</option>
                                     {% endif %}
                                 {% endfor %}
                             </optgroup>
                             <optgroup label="Прочие">
                                 {% for p in positions %}
                                     {% if p.get('position_group') == 'general' %}
-                                    <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% endif %}>{{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}</option>
+                                    <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% elif p.id == preselect_position %}selected{% endif %}>{{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}</option>
                                     {% endif %}
                                 {% endfor %}
                             </optgroup>
@@ -68,12 +69,12 @@
             </span>
             <div class="flex gap-2">
                 {% if pagination.page > 1 %}
-                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=1, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
-                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.page - 1, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=1, per_page=pagination.per_page, q=request.args.get('q',''), position=request.args.get('position')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.page - 1, per_page=pagination.per_page, q=request.args.get('q',''), position=request.args.get('position')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
                 {% endif %}
                 {% if pagination.page < pagination.total_pages %}
-                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.page + 1, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
-                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.total_pages, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.page + 1, per_page=pagination.per_page, q=request.args.get('q',''), position=request.args.get('position')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.total_pages, per_page=pagination.per_page, q=request.args.get('q',''), position=request.args.get('position')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
                 {% endif %}
             </div>
         </div>
