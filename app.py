@@ -1,4 +1,3 @@
-import base64
 import calendar
 import csv
 import io
@@ -12,7 +11,7 @@ from datetime import date, datetime, timedelta
 from urllib.parse import urlparse
 
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.styles import Font, Border, Side
 
 from dotenv import load_dotenv
 
@@ -42,7 +41,8 @@ import click
 load_dotenv()
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATABASE = os.path.join(BASE_DIR, "inventory.db")
+# Путь к базе можно переопределить переменной окружения SCLAD_DATABASE (используется в тестах).
+DATABASE = os.environ.get("SCLAD_DATABASE") or os.path.join(BASE_DIR, "inventory.db")
 SCHEMA_PATH = os.path.join(BASE_DIR, "schema.sql")
 # Директория, внутри которой разрешено сохранять резервные копии (и её поддиректории)
 BACKUP_ROOT = os.path.join(BASE_DIR, "backups")
@@ -801,6 +801,45 @@ def migrate_shift_tasks_status_not_done():
         return False
 
 
+MIGRATIONS = (
+    migrate_equipment_unique_constraint,
+    migrate_sensor_positions_group,
+    migrate_sensor_positions_labels,
+    migrate_sensors_into_equipment,
+    migrate_operations_log_encoding,
+    migrate_machine_maintenance,
+    migrate_app_settings,
+    migrate_operations_log_username,
+    migrate_indexes,
+    migrate_sim_cards_operator,
+    migrate_sim_cards_description_tariff,
+    migrate_users,
+    migrate_users_profile_and_roles,
+    migrate_login_attempts,
+    migrate_shift_tasks,
+    migrate_shift_tasks_type_and_links,
+    migrate_shift_task_types_table,
+    migrate_shift_task_completions,
+    migrate_shift_task_done_comment_and_not_done,
+    migrate_shift_tasks_status_not_done,
+)
+
+
+def run_migrations():
+    """Применить все миграции схемы по порядку (каждая безопасна при повторном запуске)."""
+    for migration in MIGRATIONS:
+        migration()
+
+
+def init_database():
+    """Создать базу из schema.sql."""
+    with open(SCHEMA_PATH, encoding="utf-8") as f:
+        conn = sqlite3.connect(DATABASE)
+        conn.executescript(f.read())
+        conn.commit()
+        conn.close()
+
+
 # Роли:
 # - admin — полный доступ и управление пользователями
 # - editor — изменение данных (склад, техника, SIM, ТО)
@@ -816,6 +855,40 @@ def _user_role(row):
         role = row["role"] if "role" in row else ""
     r = (role or "").strip().lower()
     return r if r in ("admin", "editor", "maintenance", "reader") else "reader"
+
+
+SQLITE_INT_MAX = 2**63 - 1
+
+
+def to_int(value, default=None):
+    """Безопасно превращает строку из формы/URL в целое число (иначе default)."""
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    if abs(number) > SQLITE_INT_MAX:
+        return default
+    return number
+
+
+def to_iso_date(value):
+    """Строка 'YYYY-MM-DD' (допускается хвост со временем) -> 'YYYY-MM-DD' или None, если это не дата."""
+    try:
+        return date.fromisoformat(str(value or "").strip()[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def _is_safe_next_url(url):
+    """Разрешён только относительный путь внутри сайта: /machines?q=1.
+
+    Отсекает //host, /\\host, https:host, javascript: и подобные варианты,
+    которыми можно увести пользователя на чужой сайт после входа.
+    """
+    if not url or not url.startswith("/") or url.startswith("//") or "\\" in url:
+        return False
+    parsed = urlparse(url)
+    return not parsed.scheme and not parsed.netloc
 
 
 def row_to_dict(row):
@@ -836,6 +909,17 @@ def _is_allowed_backup_path(path):
         return real_path == root_real or real_path.startswith(root_real + os.sep)
     except OSError:
         return False
+
+
+def snapshot_database(dest_path):
+    """Согласованная копия базы (SQLite online backup) в файл dest_path."""
+    src = sqlite3.connect(DATABASE)
+    dst = sqlite3.connect(dest_path)
+    try:
+        src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
 
 
 def _acquire_backup_lock():
@@ -1002,16 +1086,11 @@ def create_app():
         if db is not None:
             db.close()
 
-    def init_db():
-        db = get_db()
-        with open(SCHEMA_PATH, encoding="utf-8") as f:
-            db.executescript(f.read())
-        db.commit()
-
     @app.cli.command("init-db")
     def init_db_command():
-        """Инициализация базы данных из schema.sql."""
-        init_db()
+        """Инициализация базы данных из schema.sql и применение миграций."""
+        init_database()
+        run_migrations()
         print("База данных инициализирована.")
 
     @app.cli.command("create-user")
@@ -1094,6 +1173,19 @@ def create_app():
         db = get_db()
         return db.execute(query, params).fetchone()
 
+    REF_TABLES = {
+        "equipment", "equipment_statuses", "machines", "machine_models", "machine_types", "sim_cards",
+        "sim_statuses", "sensor_positions", "shift_task_types",
+    }
+
+    def ref_id(table, raw):
+        """id из формы, если такая запись есть в таблице, иначе None."""
+        assert table in REF_TABLES
+        id_ = to_int(raw)
+        if id_ is None:
+            return None
+        return id_ if fetch_one(f"SELECT 1 FROM {table} WHERE id = ?", (id_,)) else None
+
     def get_setting(key: str, default: str = ""):
         """Значение настройки из app_settings."""
         row = fetch_one("SELECT value FROM app_settings WHERE key = ?", (key,))
@@ -1135,6 +1227,14 @@ def create_app():
                     flash("Этому пользователю разрешено только записывать ТО и работать с заданиями на смену.", "error")
                     return redirect(request.referrer or url_for("index"))
         return None
+
+    @app.after_request
+    def set_security_headers(resp):
+        """Базовые заголовки безопасности для всех ответов."""
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        resp.headers.setdefault("Referrer-Policy", "same-origin")
+        return resp
 
     @app.errorhandler(500)
     def handle_500(err):
@@ -1210,8 +1310,8 @@ def create_app():
                         personnel_number=row.get("personnel_number"),
                     )
                     login_user(user, remember=bool(request.form.get("remember")))
-                    next_url = request.form.get("next") or request.args.get("next") or url_for("index")
-                    if urlparse(next_url).netloc:
+                    next_url = request.form.get("next") or request.args.get("next") or ""
+                    if not _is_safe_next_url(next_url):
                         next_url = url_for("index")
                     return redirect(next_url)
         return render_template("login.html", error=error)
@@ -1523,10 +1623,10 @@ def create_app():
         except (TypeError, ValueError):
             per_page = 50
         try:
-            page = max(1, int(request.args.get("page", 1) or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
-        status_id = request.args.get("status", type=int)
+        status_id = to_int(request.args.get("status"))
         q = (request.args.get("q") or "").strip()[:100]
         where, params = [], ()
         if status_id is not None:
@@ -1592,7 +1692,7 @@ def create_app():
             name = request.form.get("name")
             serial_number = request.form.get("serial_number")
             description = request.form.get("description")
-            status_id = request.form.get("status_id")
+            status_id = ref_id("equipment_statuses", request.form.get("status_id"))
             if not name or not serial_number or not status_id:
                 flash("Заполните обязательные поля.", "error")
             else:
@@ -1635,7 +1735,7 @@ def create_app():
             name = request.form.get("name")
             serial_number = request.form.get("serial_number")
             description = request.form.get("description")
-            status_id = request.form.get("status_id")
+            status_id = ref_id("equipment_statuses", request.form.get("status_id"))
             if not name or not serial_number or not status_id:
                 flash("Заполните обязательные поля.", "error")
             else:
@@ -1850,9 +1950,11 @@ def create_app():
     @app.route("/machine_types/add", methods=["GET", "POST"])
     def machine_type_add():
         if request.method == "POST":
-            name = request.form.get("name")
+            name = (request.form.get("name") or "").strip()
             if not name:
                 flash("Введите название типа.", "error")
+            elif fetch_one("SELECT 1 FROM machine_types WHERE name = ?", (name,)):
+                flash("Тип техники с таким названием уже есть.", "error")
             else:
                 db = get_db()
                 db.execute("INSERT INTO machine_types (name) VALUES (?)", (name,))
@@ -1868,9 +1970,11 @@ def create_app():
             flash("Тип техники не найден.", "error")
             return redirect(url_for("machine_types_list"))
         if request.method == "POST":
-            name = request.form.get("name")
+            name = (request.form.get("name") or "").strip()
             if not name:
                 flash("Введите название типа.", "error")
+            elif fetch_one("SELECT 1 FROM machine_types WHERE name = ? AND id != ?", (name, type_id)):
+                flash("Тип техники с таким названием уже есть.", "error")
             else:
                 db = get_db()
                 db.execute("UPDATE machine_types SET name = ? WHERE id = ?", (name, type_id))
@@ -1924,7 +2028,7 @@ def create_app():
         types_ = fetch_all("SELECT * FROM machine_types ORDER BY id")
         if request.method == "POST":
             name = request.form.get("name")
-            machine_type_id = request.form.get("machine_type_id")
+            machine_type_id = ref_id("machine_types", request.form.get("machine_type_id"))
             if not name or not machine_type_id:
                 flash("Заполните все поля.", "error")
             else:
@@ -1947,7 +2051,7 @@ def create_app():
             return redirect(url_for("machine_models_list"))
         if request.method == "POST":
             name = request.form.get("name")
-            machine_type_id = request.form.get("machine_type_id")
+            machine_type_id = ref_id("machine_types", request.form.get("machine_type_id"))
             if not name or not machine_type_id:
                 flash("Заполните все поля.", "error")
             else:
@@ -1990,10 +2094,10 @@ def create_app():
         except (TypeError, ValueError):
             per_page = 50
         try:
-            page = max(1, int(request.args.get("page", 1) or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
-        type_id = request.args.get("type", type=int)
+        type_id = to_int(request.args.get("type"))
         q = (request.args.get("q") or "").strip()[:100]
         where, params = [], ()
         if type_id is not None:
@@ -2065,7 +2169,7 @@ def create_app():
         )
         if request.method == "POST":
             inventory_number = (request.form.get("inventory_number") or "").strip()
-            machine_model_id = request.form.get("machine_model_id")
+            machine_model_id = ref_id("machine_models", request.form.get("machine_model_id"))
             if not inventory_number or not machine_model_id:
                 flash("Заполните инвентарный номер и выберите модель.", "error")
             else:
@@ -2105,7 +2209,7 @@ def create_app():
             return redirect(url_for("machines_list"))
         if request.method == "POST":
             inventory_number = (request.form.get("inventory_number") or "").strip()
-            machine_model_id = request.form.get("machine_model_id")
+            machine_model_id = ref_id("machine_models", request.form.get("machine_model_id"))
             if not inventory_number or not machine_model_id:
                 flash("Заполните инвентарный номер и выберите модель.", "error")
             else:
@@ -2302,10 +2406,10 @@ def create_app():
         except (TypeError, ValueError):
             per_page = 50
         try:
-            page = max(1, int(request.args.get("page", 1) or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
-        type_id = request.args.get("type", type=lambda x: int(x) if x and str(x).strip() else None)
+        type_id = to_int(request.args.get("type"))
         status_filter = request.args.get("status", "").strip() or None  # overdue, due_soon, ok, no_data
         machine_types = [dict(r) for r in fetch_all("SELECT id, name FROM machine_types ORDER BY name")]
         # CTE: машины с датами ТО и вычисленным to_status в SQL
@@ -2563,14 +2667,13 @@ def create_app():
             engineers.append({"id": row["id"], "label": label})
         today_str = date.today().isoformat()
         if request.method == "POST":
-            mid = request.form.get("machine_id") or (machine_id and str(machine_id))
-            performed_at = request.form.get("performed_at", "").strip()
+            mid = ref_id("machines", request.form.get("machine_id") or machine_id)
+            performed_at = to_iso_date(request.form.get("performed_at"))
             engineer_ids = request.form.getlist("engineers")
             remarks = request.form.get("remarks", "").strip()
             if not mid or not performed_at:
                 flash("Укажите технику и дату проведения ТО.", "error")
             else:
-                mid = int(mid)
                 months_val = get_setting("maintenance_interval_months", "3")
                 try:
                     months_int = max(1, min(24, int(months_val)))
@@ -2615,7 +2718,7 @@ def create_app():
     @app.route("/maintenance/act-draft")
     def maintenance_act_draft():
         """Акт для печати перед проведением ТО (без сохранённой записи)."""
-        machine_id = request.args.get("machine_id", type=int)
+        machine_id = to_int(request.args.get("machine_id"))
         performed_at = (request.args.get("performed_at") or "").strip()[:10] or None
         if not machine_id:
             flash("Укажите технику.", "error")
@@ -2810,7 +2913,7 @@ def create_app():
         if filter_shift not in ("day", "night"):
             filter_shift = None
         filter_date = (request.args.get("date") or "").strip()[:10] or today_str
-        filter_type_id = request.args.get("type", type=int)
+        filter_type_id = to_int(request.args.get("type"))
         filter_status = (request.args.get("status") or "").strip().lower() or None
         if filter_status not in ("pending", "done", "not_done"):
             filter_status = None
@@ -2823,22 +2926,19 @@ def create_app():
                 flash("Недостаточно прав для создания заданий.", "error")
                 return redirect(url_for("shift_tasks_list"))
             for_shift = (request.form.get("for_shift") or "").strip().lower()
-            effective_date = (request.form.get("effective_date") or "").strip()[:10]
-            task_type_id = request.form.get("task_type_id")
-            task_type_id = int(task_type_id) if task_type_id else None
+            effective_date = to_iso_date(request.form.get("effective_date"))
+            task_type_id = ref_id("shift_task_types", request.form.get("task_type_id"))
             if not task_type_id:
                 first_type = fetch_one("SELECT id FROM shift_task_types ORDER BY sort_order, id LIMIT 1")
                 task_type_id = first_type["id"] if first_type else None
-            machine_id = request.form.get("machine_id")
-            machine_id = int(machine_id) if machine_id else None
-            equipment_id = request.form.get("equipment_id")
-            equipment_id = int(equipment_id) if equipment_id else None
+            machine_id = ref_id("machines", request.form.get("machine_id"))
+            equipment_id = ref_id("equipment", request.form.get("equipment_id"))
             title = (request.form.get("title") or "").strip()
             description = (request.form.get("description") or "").strip() or None
             if for_shift not in ("day", "night"):
                 flash("Укажите смену (1-я или 2-я).", "error")
             elif not effective_date:
-                flash("Укажите дату смены.", "error")
+                flash("Укажите корректную дату смены.", "error")
             elif not title:
                 flash("Введите заголовок задания.", "error")
             elif not task_type_id:
@@ -2888,10 +2988,8 @@ def create_app():
             params.append(filter_status)
         where_sql = " AND ".join(where_parts)
 
-        page = request.args.get("page", 1, type=int)
-        if page < 1:
-            page = 1
-        per_page = request.args.get("per_page", 50, type=int)
+        page = max(1, min(100000, to_int(request.args.get("page"), 1)))
+        per_page = to_int(request.args.get("per_page"), 50)
         per_page = max(20, min(200, per_page)) if per_page else 50
         total = fetch_one(
             f"SELECT COUNT(*) AS c FROM shift_tasks st WHERE {where_sql}",
@@ -3013,19 +3111,16 @@ def create_app():
             return redirect(url_for("shift_tasks_list"))
         if request.method == "POST":
             for_shift = (request.form.get("for_shift") or "").strip().lower()
-            effective_date = (request.form.get("effective_date") or "").strip()[:10]
-            task_type_id = request.form.get("task_type_id")
-            task_type_id = int(task_type_id) if task_type_id else None
-            machine_id = request.form.get("machine_id")
-            machine_id = int(machine_id) if machine_id else None
-            equipment_id = request.form.get("equipment_id")
-            equipment_id = int(equipment_id) if equipment_id else None
+            effective_date = to_iso_date(request.form.get("effective_date"))
+            task_type_id = ref_id("shift_task_types", request.form.get("task_type_id"))
+            machine_id = ref_id("machines", request.form.get("machine_id"))
+            equipment_id = ref_id("equipment", request.form.get("equipment_id"))
             title = (request.form.get("title") or "").strip()
             description = (request.form.get("description") or "").strip() or None
             if for_shift not in ("day", "night"):
                 flash("Укажите смену (1-я или 2-я).", "error")
             elif not effective_date:
-                flash("Укажите дату смены.", "error")
+                flash("Укажите корректную дату смены.", "error")
             elif not title:
                 flash("Введите заголовок задания.", "error")
             elif not task_type_id:
@@ -3279,11 +3374,11 @@ def create_app():
         except (TypeError, ValueError):
             per_page = 50
         try:
-            page = max(1, int(request.args.get("page", 1) or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
-        status_id = request.args.get("status", type=lambda x: int(x) if x and str(x).strip() else None)
-        type_id = request.args.get("type", type=lambda x: int(x) if x and str(x).strip() else None)
+        status_id = to_int(request.args.get("status"))
+        type_id = to_int(request.args.get("type"))
         q = (request.args.get("q") or "").strip()[:100]
         where, params = [], ()
         if status_id is not None:
@@ -3353,7 +3448,7 @@ def create_app():
             operator = request.form.get("operator", "").strip() or None
             description = request.form.get("description", "").strip() or None
             tariff = request.form.get("tariff", "").strip() or None
-            status_id = request.form.get("status_id")
+            status_id = ref_id("sim_statuses", request.form.get("status_id"))
             if not phone_number or not iccid or not status_id:
                 flash("Заполните обязательные поля.", "error")
             else:
@@ -3387,7 +3482,7 @@ def create_app():
             operator = request.form.get("operator", "").strip() or None
             description = request.form.get("description", "").strip() or None
             tariff = request.form.get("tariff", "").strip() or None
-            status_id = request.form.get("status_id")
+            status_id = ref_id("sim_statuses", request.form.get("status_id"))
             if not phone_number or not iccid or not status_id:
                 flash("Заполните обязательные поля.", "error")
             else:
@@ -3481,7 +3576,7 @@ def create_app():
         # Свободное оборудование "На складе" (без привязки к технике) с постраничным выводом и серверным поиском
         q = (request.args.get("q") or "").strip()
         try:
-            page = max(1, int(request.args.get("page", 1) or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
         try:
@@ -3536,19 +3631,26 @@ def create_app():
             )
         ]
         if request.method == "POST":
-            equipment_id = request.form.get("equipment_id")
+            equipment_id = to_int(request.form.get("equipment_id"))
             raw_sensor_position = request.form.get("sensor_position_id")
             # Пустое значение или специальное значение "none" означают установку датчика без позиции
             if raw_sensor_position in (None, "", "none"):
                 sensor_position_id = None
             else:
-                sensor_position_id = int(raw_sensor_position)
+                sensor_position_id = ref_id("sensor_positions", raw_sensor_position)
             if not equipment_id:
                 flash("Выберите оборудование.", "error")
+            elif raw_sensor_position not in (None, "", "none") and sensor_position_id is None:
+                flash("Позиция датчика не найдена.", "error")
             else:
-                eq = fetch_one("SELECT id, equipment_kind, name FROM equipment WHERE id = ?", (equipment_id,))
+                eq = fetch_one("SELECT id, equipment_kind, name, status_id FROM equipment WHERE id = ?", (equipment_id,))
+                busy = fetch_one(
+                    "SELECT 1 FROM machine_equipment WHERE equipment_id = ? AND removed_at IS NULL", (equipment_id,)
+                )
                 if eq is None:
                     flash("Оборудование не найдено.", "error")
+                elif busy or eq["status_id"] != 1:
+                    flash("Это оборудование уже установлено или не числится на складе.", "error")
                 elif (eq["equipment_kind"] if "equipment_kind" in eq.keys() else "other") == "sensor":
                     # Для датчиков позиция теперь необязательна, но одна и та же позиция
                     # не может быть использована несколькими датчиками одновременно.
@@ -3653,7 +3755,7 @@ def create_app():
         # Свободные SIM: статус "На складе" (id=1) и не установлены ни на одной технике — с постраничным выводом и серверным поиском
         q = (request.args.get("q") or "").strip()
         try:
-            page = max(1, int(request.args.get("page", 1) or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
         try:
@@ -3692,9 +3794,17 @@ def create_app():
             (*params, per_page, offset),
         )
         if request.method == "POST":
-            sim_id = request.form.get("sim_card_id")
+            sim_id = to_int(request.form.get("sim_card_id"))
+            sim_row = fetch_one("SELECT status_id FROM sim_cards WHERE id = ?", (sim_id,)) if sim_id else None
+            sim_busy = sim_id and fetch_one(
+                "SELECT 1 FROM machine_sim_cards WHERE sim_card_id = ? AND removed_at IS NULL", (sim_id,)
+            )
             if not sim_id:
                 flash("Выберите SIM-карту.", "error")
+            elif sim_row is None:
+                flash("SIM-карта не найдена.", "error")
+            elif sim_busy or sim_row["status_id"] != 1:
+                flash("Эта SIM-карта уже установлена или не числится на складе.", "error")
             else:
                 db = get_db()
                 db.execute(
@@ -3773,7 +3883,7 @@ def create_app():
         except (TypeError, ValueError):
             per_page = 50
         try:
-            page = max(1, int(request.args.get("page") or 1))
+            page = max(1, min(100000, to_int(request.args.get("page"), 1)))
         except (TypeError, ValueError):
             page = 1
         try:
@@ -4638,11 +4748,7 @@ def create_app():
         try:
             fd, tmp_path = tempfile.mkstemp(suffix=".db")
             os.close(fd)
-            src = sqlite3.connect(DATABASE)
-            dst = sqlite3.connect(tmp_path)
-            src.backup(dst)
-            src.close()
-            dst.close()
+            snapshot_database(tmp_path)
             filename = f"inventory_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"
             dest_path = os.path.join(real_backup_dir, filename)
             shutil.copy2(tmp_path, dest_path)
@@ -4714,11 +4820,7 @@ def create_app():
         try:
             fd, tmp_path = tempfile.mkstemp(suffix=".db")
             os.close(fd)
-            src = sqlite3.connect(DATABASE)
-            dst = sqlite3.connect(tmp_path)
-            src.backup(dst)
-            src.close()
-            dst.close()
+            snapshot_database(tmp_path)
             with open(tmp_path, "rb") as f:
                 data = f.read()
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -4742,26 +4844,7 @@ def create_app():
     with app.app_context():
         if os.path.exists(app.config["DATABASE"]):
             try:
-                migrate_equipment_unique_constraint()
-                migrate_sensor_positions_group()
-                migrate_sensor_positions_labels()
-                migrate_sensors_into_equipment()
-                migrate_operations_log_encoding()
-                migrate_machine_maintenance()
-                migrate_app_settings()
-                migrate_operations_log_username()
-                migrate_indexes()
-                migrate_sim_cards_operator()
-                migrate_sim_cards_description_tariff()
-                migrate_users()
-                migrate_users_profile_and_roles()
-                migrate_login_attempts()
-                migrate_shift_tasks()
-                migrate_shift_tasks_type_and_links()
-                migrate_shift_task_types_table()
-                migrate_shift_task_completions()
-                migrate_shift_task_done_comment_and_not_done()
-                migrate_shift_tasks_status_not_done()
+                run_migrations()
             except Exception as e:
                 import sys
                 print(f"Предупреждение: миграции при старте не выполнены: {e}", file=sys.stderr)
@@ -4773,57 +4856,12 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    # Автоинициализация БД при первом запуске
+    # При первом запуске создаём базу из schema.sql и сразу применяем миграции.
     if not os.path.exists(DATABASE):
-        with app.app_context():
-            from flask import current_app
-
-            db = sqlite3.connect(current_app.config["DATABASE"])
-            db.close()
-            # Инициализация через schema.sql
-            from click import echo
-
-            echo("Создаётся база данных и выполняется schema.sql ...")
-            with app.app_context():
-                # повторно инициализируем через функцию
-                # (внутри она использует тот же путь к schema.sql)
-                from flask.cli import with_appcontext
-
-            # Прямой вызов init-db через вспомогательную логику
-            with app.app_context():
-                from pathlib import Path
-
-                with open(SCHEMA_PATH, encoding="utf-8") as f:
-                    conn = sqlite3.connect(DATABASE)
-                    conn.executescript(f.read())
-                    conn.commit()
-                    conn.close()
-            migrate_users()
-            echo("База данных создана.")
-    else:
-        # Если база уже существует, выполняем миграции
-        migrate_equipment_unique_constraint()
-        migrate_sensor_positions_group()
-        migrate_sensor_positions_labels()
-        migrate_sensors_into_equipment()
-        migrate_operations_log_encoding()
-        migrate_machine_maintenance()
-        migrate_app_settings()
-        migrate_operations_log_username()
-        migrate_indexes()
-        migrate_sim_cards_operator()
-        migrate_sim_cards_description_tariff()
-        migrate_users()
-        migrate_users_profile_and_roles()
-        migrate_login_attempts()
-        migrate_shift_tasks()
-        migrate_shift_tasks_type_and_links()
-        migrate_shift_task_types_table()
-        migrate_shift_task_completions()
-        migrate_shift_task_done_comment_and_not_done()
-        migrate_shift_tasks_status_not_done()
+        print("Создаётся база данных из schema.sql ...")
+        init_database()
+        print("База данных создана.")
+    run_migrations()
 
     debug = os.environ.get("FLASK_DEBUG", "0").lower() in ("1", "true", "yes")
     app.run(debug=debug)
-
-

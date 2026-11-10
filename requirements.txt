@@ -1,5 +1,8 @@
-flask>=3.0.0
-flask-login>=0.6.3
-flask-wtf>=1.2.0
-python-dotenv>=1.0.0
-openpyxl>=3.1.0
+# Основные зависимости. Верхние границы защищают от несовместимых мажорных обновлений.
+flask>=3.1,<4
+flask-login>=0.6.3,<0.7
+flask-wtf>=1.2,<2
+python-dotenv>=1.0,<2
+openpyxl>=3.1,<4
+# Продакшен-сервер (только Linux; на Windows для разработки достаточно `python app.py`)
+gunicorn>=23,<26; sys_platform != "win32"
