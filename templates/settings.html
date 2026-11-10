@@ -34,7 +34,7 @@
             <input type="text" id="backup_dir" name="backup_dir" value="{{ backup_dir }}"
                    placeholder="{{ backup_root }}"
                    class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg" style="max-width: 400px;">
-            <p class="text-slate-500 text-sm mt-1">Разрешена только папка приложения и её подпапки, например: {{ backup_root }}. Файлы: inventory_backup_ГГГГ-ММ-ДД_ЧЧ-ММ.db</p>
+            <p class="text-slate-500 text-sm mt-1">Разрешена только папка приложения и её подпапки, например: {{ backup_root }}. Файлы: {{ sclad_instance or "inventory" }}_backup_ГГГГ-ММ-ДД_ЧЧ-ММ.db</p>
         </div>
         <div class="field">
             <label for="backup_schedule">Расписание</label>

@@ -10,12 +10,11 @@ create_app() собирает приложение из модулей:
 import os
 import sys
 
-from dotenv import load_dotenv
 from flask import Flask
 from flask_wtf.csrf import CSRFProtect
 
-load_dotenv()
-
+# config первым: он читает .env (и файл настроек склада), остальные модули берут пути из него
+from . import config  # noqa: E402
 from . import auth, cli, context, views  # noqa: E402
 from .config import BASE_DIR, DATABASE  # noqa: E402
 from .db import close_db  # noqa: E402
@@ -35,6 +34,14 @@ def create_app():
             "Задайте длинный случайный ключ в .env, например: "
             "python -c \"import secrets; print(secrets.token_hex(32))\""
         )
+    if config.INSTANCE:
+        # Ключ подписи свой у каждого склада, даже если FLASK_SECRET_KEY общий:
+        # cookie одного склада не подходит к другому (там у пользователя с тем же id другие права).
+        app.config["SECRET_KEY"] = f"{app.config['SECRET_KEY']}:{config.INSTANCE}"
+    app.config["SESSION_COOKIE_NAME"] = config.SESSION_COOKIE_NAME
+    app.config["REMEMBER_COOKIE_NAME"] = config.REMEMBER_COOKIE_NAME
+    app.config["SCLAD_NAME"] = config.NAME
+    app.config["SCLAD_INSTANCE"] = config.INSTANCE
     app.config["DATABASE"] = DATABASE
     CSRFProtect(app)
 

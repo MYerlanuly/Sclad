@@ -10,7 +10,7 @@ from flask_login import login_required
 
 from ..auth import require_admin
 from ..backup import do_backup_to_dir, snapshot_database
-from ..config import DATABASE
+from ..config import BACKUP_FILE_PREFIX, DATABASE
 from ..db import get_setting, set_setting
 
 
@@ -78,7 +78,7 @@ def register(app):
                 data = f.read()
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
             set_setting("last_backup_at", now_str)
-            filename = f"inventory_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"
+            filename = f"{BACKUP_FILE_PREFIX}_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"
             return Response(
                 data,
                 mimetype="application/octet-stream",

@@ -50,6 +50,7 @@
     </div>
 
     <h1>Акт о проведении технического обслуживания</h1>
+    {% if sclad_instance %}<p class="act-date">{{ sclad_name }}</p>{% endif %}
 
     <p class="act-date">Дата составления акта: {% if act.performed_at %}{{ act.performed_at | datefmt }}{% else %}<span class="hand-line" style="display: inline-block; min-width: 120px;">&nbsp;</span>{% endif %}</p>
 

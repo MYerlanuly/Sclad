@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход — Инвентаризация</title>
+    <title>Вход — {{ sclad_name }}</title>
     <script src="{{ url_for('static', filename='js/tailwind.min.js') }}"></script>
 </head>
 <body class="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -11,7 +11,7 @@
         <div class="flex justify-center mb-4">
             <img src="{{ url_for('static', filename='logo.png') }}" alt="Богатырь" class="h-14 w-auto object-contain object-center" />
         </div>
-        <h1 class="text-xl font-semibold text-slate-800 text-center mb-1">Склад АСДУ</h1>
+        <h1 class="text-xl font-semibold text-slate-800 text-center mb-1">{{ sclad_name }}</h1>
         <p class="text-sm text-slate-500 text-center mb-6">Войдите в систему</p>
         {% if error %}
             <div class="mb-4 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">{{ error }}</div>

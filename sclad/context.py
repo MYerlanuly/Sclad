@@ -1,5 +1,5 @@
 """Данные, доступные во всех шаблонах."""
-from flask import session, url_for
+from flask import current_app, session, url_for
 
 
 def register(app):
@@ -31,6 +31,8 @@ def register(app):
             "status_hints_equipment": hints_equipment,
             "status_hints_sim": hints_sim,
             "recent_items": list(reversed(recent_items)),  # новые сверху
+            "sclad_name": current_app.config.get("SCLAD_NAME", "Склад АСДУ"),
+            "sclad_instance": current_app.config.get("SCLAD_INSTANCE", ""),
         }
 
     # ===== Simple helpers for lookups =====

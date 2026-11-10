@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Инвентаризация{% endblock %}</title>
+    <title>{% block title %}Инвентаризация{% endblock %} — {{ sclad_name }}</title>
     <script src="{{ url_for('static', filename='js/tailwind.min.js') }}"></script>
     <script>
         tailwind.config = {
@@ -231,7 +231,7 @@
 <header class="app-header no-print">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2">
         <div class="header-inner">
-            <h1 class="m-0 shrink-0"><a href="{{ url_for('index') }}" class="header-logo">Склад АСДУ</a></h1>
+            <h1 class="m-0 shrink-0"><a href="{{ url_for('index') }}" class="header-logo">{{ sclad_name }}</a></h1>
             {% if current_user.is_authenticated %}
             <form action="{{ url_for('quick_search') }}" method="get" role="search" class="shrink-0">
                 <input type="search" name="q" placeholder="Инв. № или серийный…" class="header-search" aria-label="Быстрый поиск">
