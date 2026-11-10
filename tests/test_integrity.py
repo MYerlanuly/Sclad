@@ -154,10 +154,10 @@ def test_maintenance_next_due_uses_interval(admin, seed):
 
 
 def test_maintenance_end_of_month_rollover():
-    import app as app_module
+    from sclad.utils import maintenance_next_due
 
-    assert app_module.maintenance_next_due("2026-11-30", 3) == "2027-02-28"
-    assert app_module.maintenance_next_due("2027-11-30", 3) == "2028-02-29"
+    assert maintenance_next_due("2026-11-30", 3) == "2027-02-28"
+    assert maintenance_next_due("2027-11-30", 3) == "2028-02-29"
 
 
 def test_maintenance_rejects_unknown_machine_and_bad_date(admin, seed):
