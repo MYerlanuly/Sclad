@@ -36,14 +36,6 @@
                 {% endfor %}
             </select>
         </label>
-        <label class="flex items-center gap-2 flex-shrink-0">
-            <span class="text-slate-600 font-medium text-sm">Установка:</span>
-            <select id="filter-installed" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
-                <option value="">Все</option>
-                <option value="yes">Установлена</option>
-                <option value="no">Не установлена</option>
-            </select>
-        </label>
         <span class="flex items-center gap-2 flex-shrink-0">
             <a href="{{ url_for('sim_cards_list') }}" class="btn btn-secondary">Сбросить</a>
         </span>
@@ -77,7 +69,7 @@
         </thead>
         <tbody>
         {% for s in sim_cards %}
-            <tr class="filter-row" data-search="{{ (s.phone_number ~ ' ' ~ s.iccid ~ ' ' ~ (s.ip_address or '') ~ ' ' ~ (s.operator or '') ~ ' ' ~ (s.tariff or '') ~ ' ' ~ (s.description or ''))|lower }}" data-status-id="{{ s.status_id }}" data-type-id="{{ s.machine_type_id or '' }}" data-installed="{{ 'yes' if s.machine_id else 'no' }}">
+            <tr class="filter-row" data-search="{{ (s.phone_number ~ ' ' ~ s.iccid ~ ' ' ~ (s.ip_address or '') ~ ' ' ~ (s.operator or '') ~ ' ' ~ (s.tariff or '') ~ ' ' ~ (s.description or ''))|lower }}" data-status-id="{{ s.status_id }}" data-type-id="{{ s.machine_type_id or '' }}">
                 <td>{{ s.id }}</td>
                 <td><a href="{{ url_for('sim_card_detail', sim_id=s.id) }}">{{ s.phone_number }}</a></td>
                 <td>{{ s.iccid }}</td>
@@ -132,24 +124,11 @@
 (function(){
     var form=document.getElementById('sim-filters');
     if(!form) return;
-    var pageInput=form.querySelector('input[name="page"]'), search=document.getElementById('filter-search'), status=document.getElementById('filter-status'), typeFilter=document.getElementById('filter-type'), installed=document.getElementById('filter-installed'), noMatch=document.getElementById('sim-no-match');
-    var rows=document.querySelectorAll('.filter-row');
+    var pageInput=form.querySelector('input[name="page"]'), search=document.getElementById('filter-search'), status=document.getElementById('filter-status'), typeFilter=document.getElementById('filter-type');
     function applyServer(){ if(pageInput) pageInput.value='1'; form.submit(); }
     if(search){ search.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); applyServer(); } }); }
     if(status) status.addEventListener('change',applyServer);
     if(typeFilter) typeFilter.addEventListener('change',applyServer);
-    function run(){
-        var i=installed&&installed.value||'';
-        var visible=0;
-        for(var k=0;k<rows.length;k++){
-            var r=rows[k], show=!i||r.getAttribute('data-installed')===i;
-            r.style.display=show?'':'none';
-            if(show) visible++;
-        }
-        if(noMatch) noMatch.style.display=(rows.length&&visible===0)?'':'none';
-    }
-    if(installed) installed.addEventListener('change',run);
-    run();
 })();
 </script>
 </div>
