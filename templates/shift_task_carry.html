@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Перенести задание{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('shift_tasks_list'), 'Задания на смену'), (none, 'Перенос')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Перенести задание на другую смену</div>
+        <div>
+            <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+    <p class="text-slate-600 text-sm mb-1">Задание: <strong>{{ task.title }}</strong></p>
+    <p class="text-slate-600 text-sm mb-1">Было на: {{ task.effective_date | datefmt }}, {% if task.for_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}</p>
+    {% if task.not_done_reason %}
+    <p class="text-slate-600 text-sm mb-1">Причина невыполнения: {{ task.not_done_reason }}</p>
+    {% endif %}
+    <p class="text-slate-500 text-xs mb-4">Будет создано новое задание с тем же текстом, техникой и оборудованием. Старое останется в списке со статусом «Не выполнено» и пометкой, куда его перенесли.</p>
+    <form method="post" action="{{ url_for('shift_task_carry', task_id=task.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="grid gap-4 mb-4" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); max-width: 380px;">
+            <div class="field mb-0">
+                <label for="effective_date" class="text-slate-600 text-sm">Новая дата *</label>
+                <input type="date" id="effective_date" name="effective_date" required value="{{ form.effective_date }}" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+            </div>
+            <div class="field mb-0">
+                <label for="for_shift" class="text-slate-600 text-sm">Смена *</label>
+                <select id="for_shift" name="for_shift" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                    <option value="day" {% if form.for_shift == 'day' %}selected{% endif %}>1-я смена</option>
+                    <option value="night" {% if form.for_shift == 'night' %}selected{% endif %}>2-я смена</option>
+                </select>
+            </div>
+        </div>
+        {% if overdue_pending %}
+        <div class="field">
+            <label for="reason" class="text-slate-600 text-sm">Почему не выполнили *</label>
+            <textarea id="reason" name="reason" rows="3" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" placeholder="Задание не закрыли на своей смене. Укажите причину (нет запчастей, техника занята и т.д.)">{{ form.reason }}</textarea>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Перенести</button>
+        <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

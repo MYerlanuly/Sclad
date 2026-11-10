@@ -11,8 +11,12 @@
     <form method="get" action="{{ url_for('shift_tasks_list') }}" class="filters flex flex-wrap items-center gap-3 mb-4" id="shift-tasks-filters">
         <input type="hidden" name="page" value="1">
         <label class="flex items-center gap-2">
-            <span class="text-slate-600 font-medium text-sm">Дата смены:</span>
-            <input type="date" name="date" value="{{ filter_date }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+            <span class="text-slate-600 font-medium text-sm">Период с:</span>
+            <input type="date" name="date_from" value="{{ filter_date_from }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">по:</span>
+            <input type="date" name="date_to" value="{{ filter_date_to }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
         </label>
         <label class="flex items-center gap-2">
             <span class="text-slate-600 font-medium text-sm">Смена:</span>
@@ -40,8 +44,77 @@
                 <option value="not_done" {% if filter_status == 'not_done' %}selected{% endif %}>Не выполнено</option>
             </select>
         </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Поиск:</span>
+            <input type="search" name="q" value="{{ filter_q }}" placeholder="Текст, инв. №, оборудование" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" style="width: 14rem;">
+        </label>
         <button type="submit" class="btn btn-secondary">Показать</button>
     </form>
+    <div class="flex flex-wrap items-center gap-2 mb-4 -mt-2 text-sm">
+        <span class="text-slate-500">Быстро:</span>
+        {% for label, p_from, p_to in period_presets %}
+        {% set active = (p_from == filter_date_from and p_to == filter_date_to) %}
+        <a href="{{ url_for('shift_tasks_list', page=1, **dict(filter_args, date_from=p_from, date_to=p_to)) }}"
+           class="px-2.5 py-1 rounded-full border {% if active %}bg-primary-600 border-primary-600 text-white{% else %}border-slate-300 text-slate-700 bg-white hover:bg-slate-100{% endif %}" style="text-decoration: none;">{{ label }}</a>
+        {% endfor %}
+        {% if filter_q or filter_shift or filter_type_id or filter_status %}
+        <a href="{{ url_for('shift_tasks_list', date_from=filter_date_from, date_to=filter_date_to) }}" class="text-slate-500 ml-2">Сбросить фильтры</a>
+        {% endif %}
+        {% if pagination %}<span class="text-slate-500 ml-auto">Найдено: {{ pagination.total }}</span>{% endif %}
+    </div>
+
+    {% if open_past_tasks %}
+    <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50/70 overflow-hidden">
+        <div class="px-5 py-3 border-b border-amber-200 bg-white">
+            <h3 class="text-base font-semibold text-slate-800 m-0">Не закрыто с прошлых смен ({{ open_past_tasks|length }}{% if open_past_more %}+{% endif %})</h3>
+            <p class="text-slate-500 text-xs m-0 mt-1">Задания, которые остались «Ожидает» или отмечены «Не выполнено» и ещё не перенесены. Перенесите их на нужную смену.</p>
+        </div>
+        <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Смена</th>
+                    <th>Задание</th>
+                    <th>Статус</th>
+                    {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in open_past_tasks %}
+                <tr>
+                    <td><a href="{{ url_for('shift_tasks_list', date=t.effective_date) }}">{{ t.effective_date | datefmt }}</a></td>
+                    <td>{% if t.for_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}</td>
+                    <td>
+                        <strong>{{ t.title }}</strong>
+                        <span class="text-slate-500 text-xs">{{ t.task_type_name or '' }}{% if t.machine_inventory_number %} · {{ t.machine_inventory_number }}{% endif %}</span>
+                    </td>
+                    <td>
+                        {% if t.status == 'not_done' %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Не выполнено</span>
+                        {% if t.not_done_reason %}<span class="text-slate-600 text-xs">{{ t.not_done_reason }}</span>{% endif %}
+                        {% else %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Не закрыто</span>
+                        {% endif %}
+                    </td>
+                    {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
+                    <td class="whitespace-nowrap">
+                        <a href="{{ url_for('shift_task_carry', task_id=t.id) }}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Перенести</a>
+                        {% if t.status == 'pending' %}
+                        <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Выполнено</a>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% if open_past_more %}
+        <p class="text-slate-500 text-xs px-5 py-2 m-0">Показаны последние {{ open_past_tasks|length }}. Остальные можно найти по дате и фильтру статуса.</p>
+        {% endif %}
+    </div>
+    {% endif %}
 
     {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
     <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
@@ -132,13 +205,13 @@
 
     {% if pagination %}
     <p class="text-sm text-slate-600 mb-2">На странице:
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=20) }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=20, **filter_args) }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
         <span class="text-slate-400">|</span>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=50) }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=50, **filter_args) }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
         <span class="text-slate-400">|</span>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=100) }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=100, **filter_args) }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
         <span class="text-slate-400">|</span>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=200) }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=200, **filter_args) }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
     </p>
     {% endif %}
 
@@ -167,6 +240,9 @@
                 <td>
                     <strong>{{ t.title }}</strong>
                     {% if t.description %}<br><span class="text-slate-600 text-sm">{{ t.description }}</span>{% endif %}
+                    {% if t.carried_from_date %}
+                    <br><span class="text-xs text-indigo-700">↪ Перенесено с <a href="{{ url_for('shift_tasks_list', date=t.carried_from_date) }}">{{ t.carried_from_date | datefmt }}</a>, {% if t.carried_from_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}{% if t.carried_from_reason %}. Причина: {{ t.carried_from_reason }}{% endif %}</span>
+                    {% endif %}
                 </td>
                 <td class="text-slate-600 text-sm">
                     {% if t.machine_inventory_number %}
@@ -193,6 +269,7 @@
                     <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Не выполнено</span>
                     {% if t.not_done_reason %}<br><span class="text-slate-600 text-sm">{{ t.not_done_reason }}</span>{% endif %}
                     {% if t.not_done_by_name or t.not_done_at %}<br><span class="text-slate-500 text-xs">{{ t.not_done_by_name or '—' }} {{ t.not_done_at | datetimefmt if t.not_done_at else '' }}</span>{% endif %}
+                    {% if t.carried_to_date %}<br><span class="text-xs text-indigo-700">→ Перенесено на <a href="{{ url_for('shift_tasks_list', date=t.carried_to_date) }}">{{ t.carried_to_date | datefmt }}</a>, {% if t.carried_to_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}</span>{% endif %}
                     {% else %}
                     <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Ожидает</span>
                     {% endif %}
@@ -209,6 +286,11 @@
                     {% endif %}
                     <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Выполнено</a>
                     <a href="{{ url_for('shift_task_not_done', task_id=t.id) }}" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Не выполнено</a>
+                    {% if t.effective_date < today_str %}
+                    <a href="{{ url_for('shift_task_carry', task_id=t.id) }}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Перенести</a>
+                    {% endif %}
+                    {% elif t.status == 'not_done' and not t.carried_to_task_id %}
+                    <a href="{{ url_for('shift_task_carry', task_id=t.id) }}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Перенести</a>
                     {% elif t.status == 'done' and t.id not in task_ids_completed_by_me %}
                     <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Отметить себя</a>
                     {% else %}
@@ -219,7 +301,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="{{ 8 if (current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance')) else 7 }}" class="muted">Заданий на выбранную дату и смену нет.</td>
+                <td colspan="{{ 8 if (current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance')) else 7 }}" class="muted">Заданий за выбранный период нет.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -230,12 +312,12 @@
         <span class="shrink-0">Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
         <div class="flex gap-2">
         {% if pagination.page > 1 %}
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.page - 1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+        <a href="{{ url_for('shift_tasks_list', page=1, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+        <a href="{{ url_for('shift_tasks_list', page=pagination.page - 1, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
         {% endif %}
         {% if pagination.page < pagination.total_pages %}
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.page + 1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
-        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.total_pages, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+        <a href="{{ url_for('shift_tasks_list', page=pagination.page + 1, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+        <a href="{{ url_for('shift_tasks_list', page=pagination.total_pages, per_page=pagination.per_page, **filter_args) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
         {% endif %}
         </div>
     </div>
