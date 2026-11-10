@@ -1,81 +1,158 @@
 {% extends "base.html" %}
-{% block title %}SIM-карта #{{ sim_card.id }}{% endblock %}
+{% block title %}SIM {{ sim_card.phone_number }}{% endblock %}
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('sim_cards_list'), 'SIM-карты'), (none, sim_card.phone_number)]) }}{% endblock %}
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">SIM-карта #{{ sim_card.id }} — {{ sim_card.phone_number }}</div>
-        <div class="no-print">
-            <button type="button" class="btn btn-secondary" onclick="window.print();">Печать</button>
-            <a href="{{ url_for('sim_card_edit', sim_id=sim_card.id) }}" class="btn btn-secondary">Изменить</a>
-            <a href="{{ url_for('sim_cards_list') }}" class="btn btn-secondary">К списку</a>
+{% from "_card_kit.html" import icon, remove_btn, post_action, copy_val with context %}
+{% include "_card_styles.html" %}
+{% set s = sim_card %}
+{% set last = periods[0] if periods else none %}
+{% set can_install = can_edit and not current and s.status_id == 1 %}
+
+{% macro period_row(p) %}
+<li class="{{ 'now' if p.active }}">
+    <span class="dot {{ 'dot-green' if p.active }}" title="{{ 'Стоит сейчас' if p.active else 'Снята' }}"></span>
+    <div class="flex-1 min-w-0">
+        <div class="truncate"><a href="{{ url_for('machine_detail', machine_id=p.machine_id) }}" class="lnk tnum">{{ p.inventory_number }}</a>
+            <span class="meta">{{ [p.type_name, p.model_name]|select|join(' · ') }}</span></div>
+        <div class="meta tnum">{% if p.active %}с {{ p.installed_at | datefmt }} · <span class="text-green-700 font-medium">стоит сейчас</span>{% else %}{{ p.installed_at | datefmt }} — {{ p.removed_at | datefmt }}{% endif %}{% if p.days is not none %} · {{ p.days }} дн.{% endif %}</div>
+    </div>
+    {% if p.active and can_edit %}{{ remove_btn(url_for('remove_sim', machine_id=p.machine_id, link_id=p.link_id), 'SIM-карту ' ~ s.phone_number, question='Снять SIM ' ~ s.phone_number ~ ' с борта ' ~ p.inventory_number ~ '? Она вернётся на склад.', back='card') }}{% endif %}
+</li>
+{% endmacro %}
+
+<div class="mc">
+{# ---------- Шапка ---------- #}
+<section class="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h2 class="m-0 text-[24px] leading-tight font-semibold text-slate-900 tnum">{{ s.phone_number }}</h2>
+            <span class="pill pill-{{ status_tone }}" title="{{ status_hints_sim.get(s.status_name, '') }}">{{ s.status_name }}</span>
         </div>
+        <div class="mt-1 text-slate-500">{{ [s.operator, s.tariff]|select|join(' · ') or 'SIM-карта' }}</div>
     </div>
-    <p><strong>Номер:</strong> {{ sim_card.phone_number }}</p>
-    <p><strong>ICCID:</strong> {{ sim_card.iccid }}</p>
-    <p><strong>Оператор связи:</strong> {{ sim_card.operator or '—' }}</p>
-    <p><strong>Тариф:</strong> {{ sim_card.tariff or '—' }}</p>
-    <p><strong>IP-адрес:</strong> {{ sim_card.ip_address or '—' }}</p>
-    <p><strong>Статус:</strong> <span data-tooltip="{{ status_hints_sim.get(sim_card.status_name, '') }}">{{ sim_card.status_name }}</span></p>
-    {% if sim_card.description %}
-    <p><strong>Описание:</strong><br><span class="text-slate-600">{{ sim_card.description }}</span></p>
+    <div class="no-print flex flex-wrap items-center gap-2">
+        {% if can_install %}
+        <details class="act-menu">
+            <summary class="act act-primary">{{ icon('truck') }} Установить на борт {{ icon('chevron', 'w-3.5 h-3.5') }}</summary>
+            <form method="get" action="{{ url_for('sim_card_install_to', sim_id=s.id) }}" class="act-menu-list pick">
+                <label for="pick-machine">Борт без SIM (инв. номер)</label>
+                <input type="text" id="pick-machine" name="machine" list="pick-machines" required autocomplete="off" placeholder="Начните вводить номер">
+                <datalist id="pick-machines">
+                    {% for m in machines %}<option value="{{ m.inventory_number }}">{{ [m.type_name, m.model_name]|select|join(' · ') }}</option>{% endfor %}
+                </datalist>
+                <button type="submit" class="act act-primary">Далее</button>
+                <div class="pick-hint">В списке только борта, на которых нет SIM-карты. Откроется подтверждение установки.</div>
+            </form>
+        </details>
+        {% elif can_edit and not current and s.status_id == 3 %}
+        {{ post_action(url_for('sim_card_set_status', sim_id=s.id), 'Разблокирована, на склад', 'undo', {'status_id': 1}, question='SIM ' ~ s.phone_number ~ ' разблокирована? Она вернётся на склад, и её можно будет установить.', cls='act act-primary') }}
+        {% endif %}
+        <details class="act-menu">
+            <summary class="act act-icon" title="Ещё" aria-label="Ещё">{{ icon('dots') }}</summary>
+            <div class="act-menu-list">
+                {% if can_edit %}
+                <a href="{{ url_for('sim_card_edit', sim_id=s.id) }}">{{ icon('edit') }} Изменить данные</a>
+                {% if not current %}
+                {% if s.status_id == 4 %}{{ post_action(url_for('sim_card_set_status', sim_id=s.id), 'Вернуть на склад', 'undo', {'status_id': 1}) }}{% endif %}
+                {% if s.status_id != 3 %}{{ post_action(url_for('sim_card_set_status', sim_id=s.id), 'Заблокирована оператором', 'alert', {'status_id': 3}) }}{% endif %}
+                {% if s.status_id != 4 %}{{ post_action(url_for('sim_card_set_status', sim_id=s.id), 'Списать', 'ban', {'status_id': 4}, question='Списать SIM ' ~ s.phone_number ~ '?') }}{% endif %}
+                {% endif %}
+                {% endif %}
+                <button type="button" onclick="window.print();">{{ icon('printer') }} Печать карточки</button>
+                {% if can_edit %}
+                <hr>
+                {% if current %}
+                <div class="menu-note">Удалить можно только снятую с борта.</div>
+                {% else %}
+                {{ post_action(url_for('sim_card_delete', sim_id=s.id), 'Удалить из учёта', 'trash', question='Удалить SIM ' ~ s.phone_number ~ ' из учёта вместе с историей? Это нельзя отменить.', cls='danger') }}
+                {% endif %}
+                {% endif %}
+            </div>
+        </details>
+    </div>
+</section>
+
+{# ---------- Плитки ---------- #}
+<section class="mb-5 grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Состояние SIM-карты">
+    {% if current %}
+    <a href="{{ url_for('machine_detail', machine_id=current.machine_id) }}" class="kpi kpi-ok">
+        <span class="kpi-icon">{{ icon('truck') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ current.inventory_number }}</span>
+            <span class="kpi-label">на борту с {{ current.installed_at | datefmt }}</span>
+        </span>
+    </a>
+    {% else %}
+    <div class="kpi {{ 'kpi-info' if s.status_id == 1 else ('kpi-critical' if s.status_id == 3 else 'kpi-zero') }}">
+        <span class="kpi-icon">{{ icon('box') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ 'На складе' if s.status_id == 1 else s.status_name }}</span>
+            <span class="kpi-label">{% if last %}снята с {{ last.inventory_number }} {{ last.removed_at | datefmt }}{% else %}ещё не устанавливали{% endif %}</span>
+        </span>
+    </div>
     {% endif %}
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">История установок</div>
+    <div class="kpi {{ 'kpi-info' if s.ip_address else 'kpi-zero' }}">
+        <span class="kpi-icon">{{ icon('net') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value" style="font-size: 18px;">{{ s.ip_address or '—' }}</span>
+            <span class="kpi-label">IP-адрес</span>
+        </span>
     </div>
-    <table>
-        <thead>
-        <tr>
-            <th>Машина</th>
-            <th>Дата установки</th>
-            <th>Дата демонтажа</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for row in mounts %}
-            <tr>
-                <td><a href="{{ url_for('machine_detail', machine_id=row.machine_id) }}">{{ row.inventory_number }}</a></td>
-                <td>{{ row.installed_at | datefmt }}</td>
-                <td>{{ row.removed_at | datefmt or '—' }}</td>
-            </tr>
-        {% else %}
-            <tr>
-                <td colspan="3" class="muted">Установок пока не было.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+    <a href="#history" class="kpi {{ 'kpi-info' if installs_total else 'kpi-zero' }}">
+        <span class="kpi-icon">{{ icon('history') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ installs_total }}</span>
+            <span class="kpi-label">{% if installs_total %}установок, бортов: {{ machines_total }}{% else %}установок не было{% endif %}</span>
+        </span>
+    </a>
+    <a href="#history" class="kpi {{ 'kpi-info' if days_on_machines else 'kpi-zero' }}">
+        <span class="kpi-icon">{{ icon('clock') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ days_on_machines }}</span>
+            <span class="kpi-label">дней на технике всего</span>
+        </span>
+    </a>
+</section>
 
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">Журнал операций</div>
-    </div>
-    <table>
-        <thead>
-        <tr>
-            <th>Дата</th>
-            <th>Тип операции</th>
-            <th>Описание</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for op in logs %}
-            <tr>
-                <td>{{ op.created_at | datefmt }}</td>
-                <td>{{ op.operation_type }}</td>
-                <td>{{ op.description }}</td>
-            </tr>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+    <section class="panel lg:col-span-2" id="history">
+        <div class="panel-head">
+            <h3 class="panel-title">История установок</h3>
+            {% if periods %}<span class="meta">всего {{ installs_total }}</span>{% endif %}
+        </div>
+        {% if periods %}
+        <ul class="rows">{% for p in periods[:8] %}{{ period_row(p) }}{% endfor %}</ul>
+        {% if periods|length > 8 %}
+        <details class="more"><summary>Показать ещё {{ periods|length - 8 }}</summary>
+            <ul class="rows" style="border-top: 1px solid var(--line-soft);">{% for p in periods[8:] %}{{ period_row(p) }}{% endfor %}</ul>
+        </details>
+        {% endif %}
         {% else %}
-            <tr>
-                <td colspan="3" class="muted">Операций пока нет.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+        <p class="empty">На технику ещё не устанавливали.{% if can_install %} Нажмите «Установить на борт» вверху.{% endif %}</p>
+        {% endif %}
+    </section>
+
+    {# ---------- Справа: сведения ---------- #}
+    <div class="flex flex-col gap-4 lg:col-start-3 lg:row-start-1 lg:row-span-2">
+        <section class="panel">
+            <div class="panel-head">
+                <h3 class="panel-title">Сведения</h3>
+                {% if can_edit %}<a href="{{ url_for('sim_card_edit', sim_id=s.id) }}" class="panel-link no-print">Изменить</a>{% endif %}
+            </div>
+            <dl class="kv m-0">
+                <dt>Номер</dt><dd>{{ copy_val(s.phone_number) }}</dd>
+                <dt>ICCID</dt><dd>{{ copy_val(s.iccid) }}</dd>
+                <dt>IP-адрес</dt><dd>{% if s.ip_address %}{{ copy_val(s.ip_address) }}{% else %}—{% endif %}</dd>
+                <dt>Оператор</dt><dd>{{ s.operator or '—' }}</dd>
+                <dt>Тариф</dt><dd>{{ s.tariff or '—' }}</dd>
+                <dt>Статус</dt><dd>{{ s.status_name }}{% if status_hints_sim.get(s.status_name) %} <span class="meta">· {{ status_hints_sim.get(s.status_name)|lower }}</span>{% endif %}</dd>
+                {% if s.description %}<dt>Описание</dt><dd>{{ s.description }}</dd>{% endif %}
+            </dl>
+        </section>
+    </div>
+
+    {% include "_card_journal.html" %}
 </div>
+</div>
+{% include "_card_script.html" %}
 {% endblock %}
-

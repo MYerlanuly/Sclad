@@ -4,10 +4,12 @@
 <div class="card">
     <div class="card-header">
         <div class="card-title">Установка SIM-карты на технику {{ machine.inventory_number }}</div>
-        <div>
+        <div class="flex flex-wrap gap-2">
+            {% if only_sim %}<a href="{{ url_for('sim_card_detail', sim_id=only_sim) }}" class="btn btn-secondary">← Назад к SIM-карте</a>{% endif %}
             <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">← Назад к технике</a>
         </div>
     </div>
+    {% if only_sim %}<p class="muted" style="margin-bottom: 12px;">Показана только выбранная SIM-карта. <a href="{{ url_for('install_sim', machine_id=machine.id) }}" class="text-blue-600">Показать все свободные</a></p>{% endif %}
     <form method="get" action="{{ url_for('install_sim', machine_id=machine.id) }}" class="field" style="margin-bottom: 14px;">
         <label for="sim-search">Поиск по номеру, ICCID или IP</label>
         <div class="flex flex-wrap gap-2 items-center">

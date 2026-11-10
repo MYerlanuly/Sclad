@@ -2,9 +2,11 @@
 import sqlite3
 
 from flask import flash, redirect, render_template, request, url_for
+from flask_login import current_user
 
-from ..db import fetch_all, fetch_one, get_db, ref_id
+from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
 from ..utils import to_int
+from .item_card import SIM_STATUS_TONE, card_logs, card_summary, install_periods, machines_for_pick
 
 
 def register(app):
@@ -185,24 +187,84 @@ def register(app):
             flash("SIM-карта не найдена.", "error")
             return redirect(url_for("sim_cards_list"))
 
-        mounts = fetch_all(
+        periods = install_periods(
+            fetch_all(
+                """
+                SELECT msc.id AS link_id, msc.machine_id, msc.installed_at, msc.removed_at,
+                       m.inventory_number, mm.name AS model_name, mt.name AS type_name
+                FROM machine_sim_cards msc
+                JOIN machines m ON msc.machine_id = m.id
+                LEFT JOIN machine_models mm ON m.machine_model_id = mm.id
+                LEFT JOIN machine_types mt ON mm.machine_type_id = mt.id
+                WHERE msc.sim_card_id = ?
+                ORDER BY msc.installed_at DESC, msc.id DESC
+                """,
+                (sim_id,),
+            )
+        )
+        can_edit = getattr(current_user, "can_edit", False)
+        return render_template(
+            "sim_card_detail.html",
+            sim_card=sim_card,
+            status_tone=SIM_STATUS_TONE.get(sim_card["status_id"], "zero"),
+            periods=periods,
+            logs=card_logs("sim_card", sim_id),
+            machines=machines_for_pick(without_sim=True) if can_edit else [],
+            can_edit=can_edit,
+            **card_summary(periods),
+        )
+
+    @app.route("/sim_cards/<int:sim_id>/install_to")
+    def sim_card_install_to(sim_id):
+        """«Установить на борт» с карточки SIM: выбрали борт — открываем установку на нём только этой SIM."""
+        if fetch_one("SELECT id FROM sim_cards WHERE id = ?", (sim_id,)) is None:
+            flash("SIM-карта не найдена.", "error")
+            return redirect(url_for("sim_cards_list"))
+        inv = (request.args.get("machine") or "").strip()
+        machine = fetch_one("SELECT id FROM machines WHERE inventory_number = ?", (inv,)) if inv else None
+        if machine is None:
+            flash(f"Борт «{inv}» не найден. Выберите борт из списка." if inv else "Укажите борт.", "error")
+            return redirect(url_for("sim_card_detail", sim_id=sim_id))
+        busy = fetch_one(
             """
-            SELECT msc.*, m.inventory_number
-            FROM machine_sim_cards msc
-            JOIN machines m ON msc.machine_id = m.id
-            WHERE msc.sim_card_id = ?
-            ORDER BY msc.installed_at DESC
+            SELECT sc.phone_number FROM machine_sim_cards msc JOIN sim_cards sc ON msc.sim_card_id = sc.id
+            WHERE msc.machine_id = ? AND msc.removed_at IS NULL
             """,
+            (machine["id"],),
+        )
+        if busy:
+            flash(f"На борту {inv} уже стоит SIM {busy['phone_number']}. Сначала снимите её.", "error")
+            return redirect(url_for("sim_card_detail", sim_id=sim_id))
+        return redirect(url_for("install_sim", machine_id=machine["id"], sim=sim_id))
+
+    @app.route("/sim_cards/<int:sim_id>/set_status", methods=["POST"])
+    def sim_card_set_status(sim_id):
+        """Быстрая смена статуса с карточки: на склад, заблокирована, списана (только если SIM не на борту)."""
+        sim_card = fetch_one(
+            "SELECT sc.id, sc.phone_number, sc.status_id, ss.name AS status_name FROM sim_cards sc "
+            "JOIN sim_statuses ss ON sc.status_id = ss.id WHERE sc.id = ?",
             (sim_id,),
         )
-        logs = fetch_all(
-            """
-            SELECT * FROM operations_log
-            WHERE entity_type = 'sim_card' AND entity_id = ?
-            ORDER BY created_at DESC
-            """,
-            (sim_id,),
+        if sim_card is None:
+            flash("SIM-карта не найдена.", "error")
+            return redirect(url_for("sim_cards_list"))
+        new_status = fetch_one("SELECT id, name FROM sim_statuses WHERE id = ?", (to_int(request.form.get("status_id")),))
+        installed = fetch_one(
+            "SELECT 1 FROM machine_sim_cards WHERE sim_card_id = ? AND removed_at IS NULL", (sim_id,)
         )
-        return render_template("sim_card_detail.html", sim_card=sim_card, mounts=mounts, logs=logs)
+        if new_status is None or new_status["id"] == 2:
+            flash("Этот статус нельзя поставить вручную.", "error")
+        elif installed:
+            flash("SIM-карта стоит на борту. Сначала снимите её.", "error")
+        elif new_status["id"] != sim_card["status_id"]:
+            db = get_db()
+            db.execute("UPDATE sim_cards SET status_id = ? WHERE id = ?", (new_status["id"], sim_id))
+            db.commit()
+            log_operation(
+                "edit", "sim_card", sim_id,
+                f"Статус SIM {sim_card['phone_number']}: {sim_card['status_name']} → {new_status['name']}",
+            )
+            flash(f"Статус изменён: {new_status['name']}.", "success")
+        return redirect(url_for("sim_card_detail", sim_id=sim_id))
 
     # --- Equipment installation on machine ---

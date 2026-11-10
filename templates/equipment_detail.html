@@ -1,78 +1,210 @@
 {% extends "base.html" %}
-{% block title %}Оборудование #{{ equipment.id }}{% endblock %}
+{% block title %}{{ equipment.name }} {{ equipment.serial_number }}{% endblock %}
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('equipment_list'), 'Оборудование'), (none, equipment.name ~ ' (' ~ (equipment.serial_number or '') ~ ')')]) }}{% endblock %}
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">Оборудование #{{ equipment.id }} — {{ equipment.name }}</div>
-        <div class="no-print">
-            <button type="button" class="btn btn-secondary" onclick="window.print();">Печать</button>
-            <a href="{{ url_for('equipment_edit', equipment_id=equipment.id) }}" class="btn btn-secondary">Изменить</a>
-            <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary">К списку</a>
+{% from "_card_kit.html" import icon, remove_btn, post_action, copy_val with context %}
+{% include "_card_styles.html" %}
+{% set e = equipment %}
+{% set is_sensor = e.equipment_kind == 'sensor' %}
+{% set last = periods[0] if periods else none %}
+{% set can_install = can_edit and not current and e.status_id == 1 %}
+
+{% macro period_row(p) %}
+<li class="{{ 'now' if p.active }}">
+    <span class="dot {{ 'dot-green' if p.active }}" title="{{ 'Стоит сейчас' if p.active else 'Снято' }}"></span>
+    <div class="flex-1 min-w-0">
+        <div class="truncate"><a href="{{ url_for('machine_detail', machine_id=p.machine_id) }}" class="lnk tnum">{{ p.inventory_number }}</a>
+            <span class="meta">{{ [p.type_name, p.model_name]|select|join(' · ') }}</span></div>
+        <div class="meta tnum">{% if p.active %}с {{ p.installed_at | datefmt }} · <span class="text-green-700 font-medium">стоит сейчас</span>{% else %}{{ p.installed_at | datefmt }} — {{ p.removed_at | datefmt }}{% endif %}{% if p.days is not none %} · {{ p.days }} дн.{% endif %}{% if p.position_code %} · позиция <span title="{{ p.position_label or '' }}">{{ p.position_code }}</span>{% endif %}</div>
+    </div>
+    {% if p.active and can_edit %}{{ remove_btn(url_for('remove_equipment', machine_id=p.machine_id, link_id=p.link_id), '«' ~ e.name ~ '» ' ~ e.serial_number, question='Снять «' ~ e.name ~ '» ' ~ e.serial_number ~ ' с борта ' ~ p.inventory_number ~ '? Статус станет «Демонтировано».', back='card') }}{% endif %}
+</li>
+{% endmacro %}
+
+<div class="mc">
+{# ---------- Шапка ---------- #}
+<section class="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h2 class="m-0 text-[24px] leading-tight font-semibold text-slate-900">{{ e.name }}</h2>
+            <span class="pill pill-{{ status_tone }}" title="{{ status_hints_equipment.get(e.status_name, '') }}">{{ e.status_name }}</span>
+            {% if is_sensor %}<span class="badge">Датчик</span>{% endif %}
+        </div>
+        <div class="mt-1 text-slate-500 flex flex-wrap items-center gap-x-2">
+            <span>S/N {{ copy_val(e.serial_number) }}</span>
+            <span>· в учёте с {{ e.added_at | datefmt }}</span>
         </div>
     </div>
-    <p><strong>Серийный номер:</strong> {{ equipment.serial_number }}</p>
-    <p><strong>Статус:</strong> <span data-tooltip="{{ status_hints_equipment.get(equipment.status_name, '') }}">{{ equipment.status_name }}</span></p>
-    <p><strong>Дата добавления:</strong> <span data-tooltip="Дата добавления в систему">{{ equipment.added_at | datefmt }}</span></p>
-    {% if equipment.description %}
-        <p><strong>Описание:</strong><br>{{ equipment.description }}</p>
+    <div class="no-print flex flex-wrap items-center gap-2">
+        {% if can_install %}
+        <details class="act-menu">
+            <summary class="act act-primary">{{ icon('truck') }} Установить на борт {{ icon('chevron', 'w-3.5 h-3.5') }}</summary>
+            <form method="get" action="{{ url_for('equipment_install_to', equipment_id=e.id) }}" class="act-menu-list pick">
+                <label for="pick-machine">Борт (инв. номер)</label>
+                <input type="text" id="pick-machine" name="machine" list="pick-machines" required autocomplete="off" placeholder="Начните вводить номер">
+                <datalist id="pick-machines">
+                    {% for m in machines %}<option value="{{ m.inventory_number }}">{{ [m.type_name, m.model_name]|select|join(' · ') }}</option>{% endfor %}
+                </datalist>
+                {% if is_sensor %}
+                <label for="pick-position" class="mt-2">Позиция датчика</label>
+                <select id="pick-position" name="position">
+                    <option value="">Выбрать на следующем шаге</option>
+                    {% for p in positions %}<option value="{{ p.id }}">{{ p.code }}{% if p.label %} — {{ p.label }}{% endif %}</option>{% endfor %}
+                </select>
+                {% endif %}
+                <button type="submit" class="act act-primary">Далее</button>
+                <div class="pick-hint">Откроется установка на выбранный борт{% if is_sensor %}: там видно, какие позиции заняты{% endif %}.</div>
+            </form>
+        </details>
+        {% elif can_edit and not current and e.status_id in (3, 4) %}
+        {{ post_action(url_for('equipment_set_status', equipment_id=e.id), 'Вернуть на склад', 'undo', {'status_id': 1}, question='Вернуть «' ~ e.name ~ '» ' ~ e.serial_number ~ ' на склад? После этого его можно будет установить.', cls='act act-primary') }}
+        {% endif %}
+        {% if can_work_shift %}
+        <a href="{{ url_for('shift_tasks_list', equipment=e.id, machine=current.machine_id if current else none, _anchor='add') }}" class="act" title="Задание на смену по этому оборудованию">{{ icon('plus') }} Задание</a>
+        {% endif %}
+        <details class="act-menu">
+            <summary class="act act-icon" title="Ещё" aria-label="Ещё">{{ icon('dots') }}</summary>
+            <div class="act-menu-list">
+                {% if can_edit %}
+                <a href="{{ url_for('equipment_edit', equipment_id=e.id) }}">{{ icon('edit') }} Изменить данные</a>
+                {% if not current %}
+                {% if e.status_id != 1 and e.status_id not in (3, 4) %}{{ post_action(url_for('equipment_set_status', equipment_id=e.id), 'Вернуть на склад', 'undo', {'status_id': 1}) }}{% endif %}
+                {% if e.status_id != 4 %}{{ post_action(url_for('equipment_set_status', equipment_id=e.id), 'Отметить неисправным', 'alert', {'status_id': 4}) }}{% endif %}
+                {% if e.status_id != 5 %}{{ post_action(url_for('equipment_set_status', equipment_id=e.id), 'Списать', 'ban', {'status_id': 5}, question='Списать «' ~ e.name ~ '» ' ~ e.serial_number ~ '?') }}{% endif %}
+                {% endif %}
+                {% endif %}
+                <button type="button" onclick="window.print();">{{ icon('printer') }} Печать карточки</button>
+                {% if can_edit %}
+                <hr>
+                {% if current %}
+                <div class="menu-note">Удалить можно только снятое с борта.</div>
+                {% else %}
+                {{ post_action(url_for('equipment_delete', equipment_id=e.id), 'Удалить из учёта', 'trash', question='Удалить «' ~ e.name ~ '» ' ~ e.serial_number ~ ' из учёта вместе с историей? Это нельзя отменить.', cls='danger') }}
+                {% endif %}
+                {% endif %}
+            </div>
+        </details>
+    </div>
+</section>
+
+{# ---------- Плитки ---------- #}
+<section class="mb-5 grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Состояние оборудования">
+    {% if current %}
+    <a href="{{ url_for('machine_detail', machine_id=current.machine_id) }}" class="kpi kpi-ok">
+        <span class="kpi-icon">{{ icon('truck') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ current.inventory_number }}</span>
+            <span class="kpi-label">{% if current.position_code %}позиция {{ current.position_code }} · {% endif %}на борту с {{ current.installed_at | datefmt }}</span>
+        </span>
+    </a>
+    {% else %}
+    <div class="kpi {{ 'kpi-info' if e.status_id == 1 else ('kpi-critical' if e.status_id == 4 else ('kpi-warning' if e.status_id == 3 else 'kpi-zero')) }}">
+        <span class="kpi-icon">{{ icon('box') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ 'На складе' if e.status_id == 1 else e.status_name }}</span>
+            <span class="kpi-label">{% if last %}снято с {{ last.inventory_number }} {{ last.removed_at | datefmt }}{% else %}ещё не устанавливали{% endif %}</span>
+        </span>
+    </div>
     {% endif %}
-</div>
+    <a href="#history" class="kpi {{ 'kpi-info' if installs_total else 'kpi-zero' }}">
+        <span class="kpi-icon">{{ icon('history') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ installs_total }}</span>
+            <span class="kpi-label">{% if installs_total %}установок, бортов: {{ machines_total }}{% else %}установок не было{% endif %}</span>
+        </span>
+    </a>
+    <a href="#history" class="kpi {{ 'kpi-info' if days_on_machines else 'kpi-zero' }}">
+        <span class="kpi-icon">{{ icon('clock') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ days_on_machines }}</span>
+            <span class="kpi-label">дней на технике всего</span>
+        </span>
+    </a>
+    <a href="#tasks" class="kpi {{ 'kpi-warning' if open_tasks else 'kpi-zero' }}">
+        <span class="kpi-icon">{{ icon('list') }}</span>
+        <span class="kpi-body">
+            <span class="kpi-value">{{ open_tasks|length }}</span>
+            <span class="kpi-label">открытых заданий на смену</span>
+        </span>
+    </a>
+</section>
 
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">История установок</div>
-    </div>
-    <table>
-        <thead>
-        <tr>
-            <th>Машина</th>
-            <th>Дата установки</th>
-            <th>Дата демонтажа</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for row in installs %}
-            <tr>
-                <td><a href="{{ url_for('machine_detail', machine_id=row.machine_id) }}">{{ row.inventory_number }}</a></td>
-                <td><span data-tooltip="Дата установки на технику">{{ row.installed_at | datefmt }}</span></td>
-                <td><span data-tooltip="Дата снятия с техники">{{ row.removed_at | datefmt or '—' }}</span></td>
-            </tr>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+    <section class="panel lg:col-span-2" id="history">
+        <div class="panel-head">
+            <h3 class="panel-title">История установок</h3>
+            {% if periods %}<span class="meta">всего {{ installs_total }}</span>{% endif %}
+        </div>
+        {% if periods %}
+        <ul class="rows">{% for p in periods[:8] %}{{ period_row(p) }}{% endfor %}</ul>
+        {% if periods|length > 8 %}
+        <details class="more"><summary>Показать ещё {{ periods|length - 8 }}</summary>
+            <ul class="rows" style="border-top: 1px solid var(--line-soft);">{% for p in periods[8:] %}{{ period_row(p) }}{% endfor %}</ul>
+        </details>
+        {% endif %}
         {% else %}
-            <tr>
-                <td colspan="3" class="muted">Установок пока не было.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+        <p class="empty">На технику ещё не устанавливали.{% if can_install %} Нажмите «Установить на борт» вверху.{% endif %}</p>
+        {% endif %}
+    </section>
 
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">Журнал операций</div>
+    {# ---------- Справа: сведения и задания ---------- #}
+    <div class="flex flex-col gap-4 lg:col-start-3 lg:row-start-1 lg:row-span-2">
+        <section class="panel">
+            <div class="panel-head">
+                <h3 class="panel-title">Сведения</h3>
+                {% if can_edit %}<a href="{{ url_for('equipment_edit', equipment_id=e.id) }}" class="panel-link no-print">Изменить</a>{% endif %}
+            </div>
+            <dl class="kv m-0">
+                <dt>Наименование</dt><dd>{{ e.name }}</dd>
+                <dt>Серийный №</dt><dd>{{ copy_val(e.serial_number) }}</dd>
+                <dt>Вид</dt><dd>{{ 'Датчик' if is_sensor else 'Оборудование' }}</dd>
+                <dt>Статус</dt><dd>{{ e.status_name }}{% if status_hints_equipment.get(e.status_name) %} <span class="meta">· {{ status_hints_equipment.get(e.status_name)|lower }}</span>{% endif %}</dd>
+                <dt>В учёте с</dt><dd class="tnum">{{ e.added_at | datefmt }}</dd>
+                {% if e.description %}<dt>Описание</dt><dd>{{ e.description }}</dd>{% endif %}
+            </dl>
+        </section>
+
+        <section class="panel" id="tasks">
+            <div class="panel-head">
+                <h3 class="panel-title">Задания на смену</h3>
+                <a href="{{ url_for('shift_tasks_list', date_from='', date_to='', q=e.serial_number) }}" class="panel-link">Все →</a>
+            </div>
+            {% if open_tasks %}
+            <ul class="rows">
+                {% for t in open_tasks %}
+                <li>
+                    {% if t.status == 'not_done' %}<span class="tick tick-fail" title="Не выполнено">{{ icon('x', 'w-3 h-3') }}</span>
+                    {% elif can_work_shift %}<a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="tick" title="Отметить выполнение" aria-label="Отметить выполнение: {{ t.title }}">{{ icon('check', 'w-3 h-3') }}</a>
+                    {% else %}<span class="tick" title="Ожидает"></span>{% endif %}
+                    <div class="flex-1 min-w-0">
+                        <div class="truncate text-slate-900">{{ t.title }}</div>
+                        <div class="meta truncate">{{ t.effective_date | datefmt }}, {{ '1-я' if t.for_shift == 'day' else '2-я' }} смена{% if t.inventory_number %} · {{ t.inventory_number }}{% endif %}{% if t.status == 'not_done' and t.not_done_reason %} · <span class="text-red-600">{{ t.not_done_reason }}</span>{% endif %}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty">Открытых заданий нет.{% if can_work_shift %} <a href="{{ url_for('shift_tasks_list', equipment=e.id, machine=current.machine_id if current else none, _anchor='add') }}" class="no-print">Добавить</a>{% endif %}</p>
+            {% endif %}
+            {% if done_tasks %}
+            <div class="group-cap"><span>Недавно выполнены</span></div>
+            <ul class="rows">
+                {% for t in done_tasks %}
+                <li>
+                    <span class="tick tick-done" title="Выполнено">{{ icon('check', 'w-3 h-3') }}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="truncate text-slate-500">{{ t.title }}</div>
+                        <div class="meta">{{ t.effective_date | datefmt }}, {{ '1-я' if t.for_shift == 'day' else '2-я' }} смена</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </section>
     </div>
-    <table>
-        <thead>
-        <tr>
-            <th>Дата</th>
-            <th>Тип операции</th>
-            <th>Описание</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for op in logs %}
-            <tr>
-                <td>{{ op.created_at | datefmt }}</td>
-                <td>{{ op.operation_type }}</td>
-                <td>{{ op.description }}</td>
-            </tr>
-        {% else %}
-            <tr>
-                <td colspan="3" class="muted">Операций пока нет.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+
+    {% include "_card_journal.html" %}
 </div>
+</div>
+{% include "_card_script.html" %}
 {% endblock %}
-

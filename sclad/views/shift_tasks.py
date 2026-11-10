@@ -320,6 +320,11 @@ def register(app):
         # ?machine=<id> (кнопка «+ Задание» с карточки борта) — техника в форме уже выбрана
         add_machine_id = to_int(request.args.get("machine"))
         add_machine = next((m for m in machines if m["id"] == add_machine_id), None)
+        # ?equipment=<id> (кнопка «+ Задание» с карточки оборудования) — оборудование уже выбрано
+        add_equipment = fetch_one(
+            "SELECT id, name, serial_number, equipment_kind FROM equipment WHERE id = ?",
+            (to_int(request.args.get("equipment")),),
+        )
         # Оборудование в форму не выгружается целиком: оно подбирается поиском (/api/equipment/search)
         equipment = []
         task_types = [dict(r) for r in fetch_all("SELECT id, name FROM shift_task_types ORDER BY sort_order, id")]
@@ -399,6 +404,7 @@ def register(app):
             today_str=today_str,
             machines=machines,
             add_machine=add_machine,
+            add_equipment=add_equipment,
             equipment=equipment,
             task_types=task_types,
             pagination={"page": page, "per_page": per_page, "total": total, "total_pages": total_pages},

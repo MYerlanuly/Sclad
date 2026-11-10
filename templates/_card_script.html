@@ -1,0 +1,28 @@
+<script>
+(function() {
+    // Меню в шапке закрываются по клику мимо; при открытии одного другие закрываются
+    document.addEventListener('click', function(e) {
+        document.querySelectorAll('.mc .act-menu[open]').forEach(function(d) { if (!d.contains(e.target)) d.removeAttribute('open'); });
+    });
+    document.querySelectorAll('.mc .act-menu').forEach(function(d) {
+        d.addEventListener('toggle', function() {
+            if (!d.open) return;
+            var first = d.querySelector('.pick input, .pick select');
+            if (first) first.focus();
+        });
+    });
+    // Кнопка «скопировать» рядом с ICCID, IP, серийным номером
+    document.querySelectorAll('.mc .copy-btn').forEach(function(b) {
+        b.addEventListener('click', function() {
+            var text = b.getAttribute('data-copy') || '';
+            function done() { b.classList.add('copied'); b.title = 'Скопировано'; setTimeout(function() { b.classList.remove('copied'); b.title = 'Скопировать'; }, 1500); }
+            if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(done, function() {}); return; }
+            // http в локальной сети: Clipboard API недоступен — через скрытое поле
+            var t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+            document.body.appendChild(t); t.select();
+            try { document.execCommand('copy'); done(); } catch (err) {}
+            document.body.removeChild(t);
+        });
+    });
+})();
+</script>

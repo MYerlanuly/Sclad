@@ -4,10 +4,12 @@
 <div class="card">
     <div class="card-header">
         <div class="card-title">{% if preselect_position_code %}Установка датчика на позицию {{ preselect_position_code }}, борт{% else %}Установка оборудования на технику{% endif %} {{ machine.inventory_number }}</div>
-        <div>
+        <div class="flex flex-wrap gap-2">
+            {% if only_equipment %}<a href="{{ url_for('equipment_detail', equipment_id=only_equipment) }}" class="btn btn-secondary">← Назад к оборудованию</a>{% endif %}
             <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">← Назад к технике</a>
         </div>
     </div>
+    {% if only_equipment %}<p class="muted mb-3">Показано только выбранное оборудование.{% if equipment_list and equipment_list[0].get('equipment_kind') == 'sensor' %} Выберите позицию датчика и нажмите «Установить».{% endif %} <a href="{{ url_for('install_equipment', machine_id=machine.id) }}" class="text-blue-600">Показать всё свободное</a></p>{% endif %}
     <form method="get" action="{{ url_for('install_equipment', machine_id=machine.id) }}" class="field mb-3">
         <label for="equipment-search">Поиск по названию или серийному номеру</label>
         <div class="flex flex-wrap gap-2 items-center">
@@ -19,6 +21,7 @@
             <input type="hidden" name="per_page" value="{{ pagination.per_page }}">
             {% endif %}
             {% if request.args.get('position') %}<input type="hidden" name="position" value="{{ request.args.get('position') }}">{% endif %}
+            {% if only_equipment %}<input type="hidden" name="equipment" value="{{ only_equipment }}">{% endif %}
             <button type="submit" class="btn btn-secondary">Найти</button>
             {% if request.args.get('q') %}
             <a href="{{ url_for('install_equipment', machine_id=machine.id, position=request.args.get('position')) }}" class="btn btn-secondary">Сбросить поиск</a>

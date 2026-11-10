@@ -57,6 +57,11 @@ def register(app):
         preselect_position = to_int(request.args.get("position"))
         if preselect_position:
             where_sql.append("e.equipment_kind = 'sensor'")
+        # ?equipment=<id> — «Установить на борт» с карточки оборудования: в списке только оно
+        only_equipment = to_int(request.args.get("equipment"))
+        if only_equipment:
+            where_sql.append("e.id = ?")
+            params.append(only_equipment)
         if q:
             where_sql.append(
                 "(e.name LIKE ? OR e.serial_number LIKE ? OR IFNULL(e.description, '') LIKE ?)"
@@ -153,6 +158,7 @@ def register(app):
             used_positions=used_positions,
             preselect_position=preselect_position if preselect_position not in used_positions else None,
             preselect_position_code=next((p["code"] for p in positions if p["id"] == preselect_position), None),
+            only_equipment=only_equipment,
             pagination=pagination,
         )
 
@@ -188,6 +194,8 @@ def register(app):
             f"Демонтаж оборудования «{eq_name}» с техники {inv_num}",
         )
         flash("Оборудование демонтировано.", "success")
+        if request.form.get("back") == "card":
+            return redirect(url_for("equipment_detail", equipment_id=link["equipment_id"]))
         return redirect(url_for("machine_detail", machine_id=machine_id))
 
     # --- SIM installation on machine ---
@@ -224,6 +232,11 @@ def register(app):
             "NOT EXISTS (SELECT 1 FROM machine_sim_cards msc WHERE msc.sim_card_id = sc.id AND msc.removed_at IS NULL)",
         ]
         params = []
+        # ?sim=<id> — «Установить на борт» с карточки SIM: в списке только она
+        only_sim = to_int(request.args.get("sim"))
+        if only_sim:
+            where_sql.append("sc.id = ?")
+            params.append(only_sim)
         if q:
             where_sql.append(
                 "(sc.phone_number LIKE ? OR sc.iccid LIKE ? OR IFNULL(sc.ip_address, '') LIKE ?)"
@@ -296,7 +309,7 @@ def register(app):
             "total": total_free,
             "total_pages": total_pages,
         }
-        return render_template("install_sim.html", machine=machine, sims=free_sims, pagination=pagination)
+        return render_template("install_sim.html", machine=machine, sims=free_sims, pagination=pagination, only_sim=only_sim)
 
     @app.route("/machines/<int:machine_id>/remove_sim/<int:link_id>", methods=["POST"])
     def remove_sim(machine_id, link_id):
@@ -331,6 +344,8 @@ def register(app):
             f"Демонтаж SIM-карты {phone} с техники {inv_num}",
         )
         flash("SIM-карта демонтирована.", "success")
+        if request.form.get("back") == "card":
+            return redirect(url_for("sim_card_detail", sim_id=link["sim_card_id"]))
         return redirect(url_for("machine_detail", machine_id=machine_id))
 
     # --- Operations log ---

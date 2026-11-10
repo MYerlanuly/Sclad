@@ -2,9 +2,11 @@
 import sqlite3
 
 from flask import flash, redirect, render_template, request, session, url_for
+from flask_login import current_user
 
-from ..db import fetch_all, fetch_one, get_db, ref_id
+from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
 from ..utils import to_int
+from .item_card import EQUIPMENT_STATUS_TONE, card_logs, card_summary, install_periods, machines_for_pick
 
 
 def register(app):
@@ -202,27 +204,117 @@ def register(app):
             flash("Оборудование не найдено.", "error")
             return redirect(url_for("equipment_list"))
 
-        installs = fetch_all(
-            """
-            SELECT me.*, m.inventory_number
-            FROM machine_equipment me
-            JOIN machines m ON me.machine_id = m.id
-            WHERE me.equipment_id = ?
-            ORDER BY me.installed_at DESC
-            """,
-            (equipment_id,),
+        periods = install_periods(
+            fetch_all(
+                """
+                SELECT me.id AS link_id, me.machine_id, me.installed_at, me.removed_at,
+                       m.inventory_number, mm.name AS model_name, mt.name AS type_name,
+                       sp.code AS position_code, sp.label AS position_label
+                FROM machine_equipment me
+                JOIN machines m ON me.machine_id = m.id
+                LEFT JOIN machine_models mm ON m.machine_model_id = mm.id
+                LEFT JOIN machine_types mt ON mm.machine_type_id = mt.id
+                LEFT JOIN sensor_positions sp ON me.sensor_position_id = sp.id
+                WHERE me.equipment_id = ?
+                ORDER BY me.installed_at DESC, me.id DESC
+                """,
+                (equipment_id,),
+            )
         )
-        logs = fetch_all(
-            """
-            SELECT * FROM operations_log
-            WHERE entity_type = 'equipment' AND entity_id = ?
-            ORDER BY created_at DESC
-            """,
-            (equipment_id,),
+        summary = card_summary(periods)
+
+        # Задания на смену по этому оборудованию: открытые и последние выполненные
+        task_sql = """
+            SELECT st.id, st.title, st.status, st.effective_date, st.for_shift, st.not_done_reason,
+                   tt.name AS task_type_name, m.inventory_number
+            FROM shift_tasks st
+            LEFT JOIN shift_task_types tt ON st.task_type_id = tt.id
+            LEFT JOIN machines m ON st.machine_id = m.id
+            WHERE st.equipment_id = ? AND {where}
+            ORDER BY st.effective_date DESC, st.for_shift DESC, st.id DESC
+            LIMIT ?
+        """
+        open_tasks = fetch_all(
+            task_sql.format(where="st.carried_to_task_id IS NULL AND st.status IN ('pending', 'not_done')"),
+            (equipment_id, 20),
         )
+        done_tasks = fetch_all(task_sql.format(where="st.status = 'done'"), (equipment_id, 3))
+
+        positions = fetch_all(
+            "SELECT id, code, label, position_group FROM sensor_positions ORDER BY COALESCE(sort_order, 99), id"
+        )
+
         recent = [r for r in (session.get("recent") or []) if not (r.get("type") == "equipment" and r.get("id") == equipment_id)]
         recent.append({"type": "equipment", "id": equipment_id, "label": (equipment["name"] or equipment["serial_number"] or f"#{equipment_id}")[:50]})
         session["recent"] = recent[-10:]
-        return render_template("equipment_detail.html", equipment=equipment, installs=installs, logs=logs)
+        role = getattr(current_user, "role", None)
+        return render_template(
+            "equipment_detail.html",
+            equipment=equipment,
+            status_tone=EQUIPMENT_STATUS_TONE.get(equipment["status_id"], "zero"),
+            periods=periods,
+            logs=card_logs("equipment", equipment_id),
+            open_tasks=open_tasks,
+            done_tasks=done_tasks,
+            positions=positions,
+            machines=machines_for_pick() if getattr(current_user, "can_edit", False) else [],
+            can_edit=getattr(current_user, "can_edit", False),
+            can_work_shift=role in ("admin", "editor", "maintenance"),
+            **summary,
+        )
+
+    @app.route("/equipment/<int:equipment_id>/install_to")
+    def equipment_install_to(equipment_id):
+        """«Установить на борт» с карточки: выбрали борт — открываем установку на нём только этого оборудования."""
+        equipment = fetch_one("SELECT id FROM equipment WHERE id = ?", (equipment_id,))
+        if equipment is None:
+            flash("Оборудование не найдено.", "error")
+            return redirect(url_for("equipment_list"))
+        inv = (request.args.get("machine") or "").strip()
+        machine = fetch_one("SELECT id FROM machines WHERE inventory_number = ?", (inv,)) if inv else None
+        if machine is None:
+            flash(f"Борт «{inv}» не найден. Выберите борт из списка." if inv else "Укажите борт.", "error")
+            return redirect(url_for("equipment_detail", equipment_id=equipment_id))
+        return redirect(url_for(
+            "install_equipment",
+            machine_id=machine["id"],
+            equipment=equipment_id,
+            position=to_int(request.args.get("position")),
+        ))
+
+    @app.route("/equipment/<int:equipment_id>/set_status", methods=["POST"])
+    def equipment_set_status(equipment_id):
+        """Быстрая смена статуса с карточки: вернуть на склад, неисправно, списать.
+
+        Только для оборудования, которое не стоит на борту: «Установлено» ставится и снимается установкой.
+        """
+        equipment = fetch_one(
+            "SELECT e.id, e.name, e.status_id, s.name AS status_name FROM equipment e "
+            "JOIN equipment_statuses s ON e.status_id = s.id WHERE e.id = ?",
+            (equipment_id,),
+        )
+        if equipment is None:
+            flash("Оборудование не найдено.", "error")
+            return redirect(url_for("equipment_list"))
+        new_status = fetch_one(
+            "SELECT id, name FROM equipment_statuses WHERE id = ?", (to_int(request.form.get("status_id")),)
+        )
+        installed = fetch_one(
+            "SELECT 1 FROM machine_equipment WHERE equipment_id = ? AND removed_at IS NULL", (equipment_id,)
+        )
+        if new_status is None or new_status["id"] == 2:
+            flash("Этот статус нельзя поставить вручную.", "error")
+        elif installed:
+            flash("Оборудование стоит на борту. Сначала снимите его.", "error")
+        elif new_status["id"] != equipment["status_id"]:
+            db = get_db()
+            db.execute("UPDATE equipment SET status_id = ? WHERE id = ?", (new_status["id"], equipment_id))
+            db.commit()
+            log_operation(
+                "edit", "equipment", equipment_id,
+                f"Статус «{equipment['name']}»: {equipment['status_name']} → {new_status['name']}",
+            )
+            flash(f"Статус изменён: {new_status['name']}.", "success")
+        return redirect(url_for("equipment_detail", equipment_id=equipment_id))
 
     # --- Machine types & models & machines ---
