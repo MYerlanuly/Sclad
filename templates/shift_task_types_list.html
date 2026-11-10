@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Типы заданий на смену{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('shift_tasks_list'), 'Задания на смену'), (none, 'Типы заданий')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Типы заданий на смену</div>
+        <div>
+            <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">К заданиям</a>
+            {% if current_user.is_authenticated and current_user.can_edit %}
+            <a href="{{ url_for('shift_task_type_add') }}" class="btn btn-primary">Добавить тип</a>
+            {% endif %}
+        </div>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">Типы используются при создании заданий на смену (ТО, замена датчика, неисправность и т.д.). Порядок влияет на отображение в списке.</p>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Название</th>
+                <th>Порядок</th>
+                {% if current_user.is_authenticated and current_user.can_edit %}
+                <th></th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for tt in types_list %}
+            <tr>
+                <td>{{ tt.name }}</td>
+                <td>{{ tt.sort_order or 0 }}</td>
+                {% if current_user.is_authenticated and current_user.can_edit %}
+                <td>
+                    <a href="{{ url_for('shift_task_type_edit', type_id=tt.id) }}" class="btn btn-secondary">Изменить</a>
+                    <form method="post" action="{{ url_for('shift_task_type_delete', type_id=tt.id) }}" class="inline" onsubmit="return confirm('Удалить тип? Задания с этим типом нужно будет сначала изменить.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{{ 3 if (current_user.is_authenticated and current_user.can_edit) else 2 }}" class="muted">Типы не заданы. Добавьте первый тип.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

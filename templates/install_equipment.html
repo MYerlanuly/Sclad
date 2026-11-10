@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Установка оборудования{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Установка оборудования на технику {{ machine.inventory_number }}</div>
+        <div>
+            <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">← Назад к технике</a>
+        </div>
+    </div>
+    <form method="get" action="{{ url_for('install_equipment', machine_id=machine.id) }}" class="field mb-3">
+        <label for="equipment-search">Поиск по названию или серийному номеру</label>
+        <div class="flex flex-wrap gap-2 items-center">
+            <input type="text" id="equipment-search" name="q"
+                   class="max-w-md w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                   placeholder="Введите часть названия или серийного номера..."
+                   value="{{ request.args.get('q', '') }}" autofocus>
+            {% if pagination %}
+            <input type="hidden" name="per_page" value="{{ pagination.per_page }}">
+            {% endif %}
+            <button type="submit" class="btn btn-secondary">Найти</button>
+            {% if request.args.get('q') %}
+            <a href="{{ url_for('install_equipment', machine_id=machine.id) }}" class="btn btn-secondary">Сбросить поиск</a>
+            {% endif %}
+        </div>
+    </form>
+    {% if equipment_list %}
+        <div id="equipment-list" class="install-list">
+            {% for e in equipment_list %}
+            <div class="install-row" data-search="{{ (e.name ~ ' ' ~ e.serial_number)|lower }}">
+                <form method="post" class="install-row-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="equipment_id" value="{{ e.id }}">
+                    <span class="install-row-text">{{ e.name }} — <strong>{{ e.serial_number }}</strong>{% if e.description %} <span class="muted">({{ e.description }})</span>{% endif %}{% if e.get('equipment_kind') == 'sensor' %} <span class="badge">Датчик</span>{% endif %}</span>
+                    {% if e.get('equipment_kind') == 'sensor' %}
+                    <label class="install-position-label flex items-center gap-2">
+                        <span class="text-slate-600 font-medium">Позиция:</span>
+                        <select name="sensor_position_id" class="px-2 py-1 text-sm border border-slate-300 rounded-md">
+                            <option value="">— выбрать —</option>
+                            <option value="none">Без позиции</option>
+                            <optgroup label="Колёса">
+                                {% for p in positions %}
+                                    {% if p.get('position_group', 'wheel') == 'wheel' %}
+                                    <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% endif %}>{{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Прочие">
+                                {% for p in positions %}
+                                    {% if p.get('position_group') == 'general' %}
+                                    <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% endif %}>{{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </label>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary">Установить</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% if pagination and pagination.total_pages > 1 %}
+        <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-3 mb-2">
+            <span class="shrink-0">
+                Страница {{ pagination.page }} из {{ pagination.total_pages }}
+                ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})
+            </span>
+            <div class="flex gap-2">
+                {% if pagination.page > 1 %}
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=1, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.page - 1, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+                {% endif %}
+                {% if pagination.page < pagination.total_pages %}
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.page + 1, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+                <a href="{{ url_for('install_equipment', machine_id=machine.id, page=pagination.total_pages, per_page=pagination.per_page, q=request.args.get('q','')) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+        {% if request.args.get('q') %}
+        <p class="muted">Свободного оборудования «На складе» по заданному поиску не найдено. Измените запрос или сбросьте поиск.</p>
+        {% else %}
+        <p class="muted">Свободного оборудования «На складе» нет.</p>
+        {% endif %}
+    {% endif %}
+    <p class="mt-4"><a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">← Назад к технике</a></p>
+</div>
+{% endblock %}
+

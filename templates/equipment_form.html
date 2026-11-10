@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% if equipment %}
+    {% set page_title = "Редактирование оборудования" %}
+{% else %}
+    {% set page_title = "Добавление оборудования" %}
+{% endif %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('equipment_list'), 'Оборудование'), (none, 'Редактирование ' ~ equipment.name if equipment else 'Добавление')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">{{ page_title }}</div>
+        <div>
+            <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary">← Назад к списку</a>
+        </div>
+    </div>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="name">Наименование *</label>
+            <input type="text" id="name" name="name" required value="{{ (equipment.name if equipment) or '' }}">
+        </div>
+        <div class="field">
+            <label for="serial_number">Серийный номер *</label>
+            <input type="text" id="serial_number" name="serial_number" required value="{{ (equipment.serial_number if equipment) or '' }}">
+        </div>
+        <div class="field">
+            <label for="description">Описание</label>
+            <textarea id="description" name="description">{{ (equipment.description if equipment) or '' }}</textarea>
+        </div>
+        <div class="field">
+            <label for="equipment_kind">Вид *</label>
+            <select id="equipment_kind" name="equipment_kind" required>
+                <option value="other" {% if equipment and equipment.equipment_kind == 'other' %}selected{% elif not equipment %}selected{% endif %}>Оборудование</option>
+                <option value="sensor" {% if equipment and equipment.equipment_kind == 'sensor' %}selected{% endif %}>Датчик</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="status_id">Статус *</label>
+            <select id="status_id" name="status_id" required>
+                {% for st in statuses %}
+                    <option value="{{ st.id }}"
+                            {% if equipment and equipment.status_id == st.id %}selected{% endif %}>
+                        {{ st.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary">← Назад к списку</a>
+    </form>
+</div>
+{% endblock %}
+

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% if machine %}
+    {% set page_title = "Редактирование техники" %}
+{% else %}
+    {% set page_title = "Добавление техники" %}
+{% endif %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('machines_list'), 'Техника'), (none, 'Редактирование ' ~ machine.inventory_number if machine else 'Добавление')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">{{ page_title }}</div>
+        <div>
+            <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">← Назад к списку</a>
+        </div>
+    </div>
+    {% if not models %}
+        <p class="muted">Нет ни одной модели техники. Сначала добавьте модель, затем можно будет добавить технику.</p>
+        <a href="{{ url_for('machine_models_list') }}" class="btn btn-primary">Перейти к моделям</a>
+        <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">← Назад к списку</a>
+    {% else %}
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="inventory_number">Инвентарный номер *</label>
+            <input type="text" id="inventory_number" name="inventory_number" required
+                   value="{{ machine.inventory_number if machine else '' }}"
+                   placeholder="Например: A-001">
+        </div>
+        <div class="field">
+            <label for="machine_model_id">Модель техники *</label>
+            <select id="machine_model_id" name="machine_model_id" required>
+                <option value="">— Выберите модель —</option>
+                {% for m in models %}
+                    <option value="{{ m.id }}" {% if machine and machine.machine_model_id == m.id %}selected{% endif %}>
+                        {{ m.name }} ({{ m.type_name }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">← Назад к списку</a>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

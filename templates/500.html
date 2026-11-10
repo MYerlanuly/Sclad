@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Ошибка сервера{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Ошибка')]) }}{% endblock %}
+{% block content %}
+<div class="card max-w-xl">
+    <div class="card-header">
+        <div class="card-title">Ошибка сервера</div>
+    </div>
+    <p class="text-slate-600">Произошла внутренняя ошибка. Попробуйте повторить действие позже или обратитесь к администратору.</p>
+    <p class="mt-4"><a href="{{ url_for('index') }}" class="btn btn-primary">На главную</a></p>
+</div>
+{% endblock %}

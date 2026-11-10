@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}SIM-карты{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'SIM-карты')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">SIM-карты</div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('import_page') }}" class="btn btn-secondary">Массовый ввод</a>
+            <a href="{{ url_for('export_inventory_excel') }}" class="btn btn-secondary">Экспорт в Excel</a>
+            <a href="{{ url_for('sim_card_add') }}" class="btn btn-primary">Добавить SIM</a>
+        </div>
+    </div>
+    <form method="get" action="{{ url_for('sim_cards_list') }}" class="filters flex flex-wrap items-center gap-3 mb-3" id="sim-filters">
+        <input type="hidden" name="page" value="1">
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Поиск:</span>
+            <input type="text" name="q" id="filter-search" value="{{ filter_q or '' }}" placeholder="Телефон, ICCID, IP" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg w-52" autocomplete="off">
+        </label>
+        <button type="submit" class="btn btn-secondary">Поиск</button>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Статус:</span>
+            <select name="status" id="filter-status" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for st in statuses %}
+                    <option value="{{ st.id }}" {{ 'selected' if filter_status == st.id else '' }}>{{ st.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Тип техники:</span>
+            <select name="type" id="filter-type" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for t in machine_types %}
+                    <option value="{{ t.id }}" {{ 'selected' if filter_type == t.id else '' }}>{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Установка:</span>
+            <select id="filter-installed" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="yes">Установлена</option>
+                <option value="no">Не установлена</option>
+            </select>
+        </label>
+        <span class="flex items-center gap-2 flex-shrink-0">
+            <a href="{{ url_for('sim_cards_list') }}" class="btn btn-secondary">Сбросить</a>
+        </span>
+    </form>
+    {% if pagination %}
+    <p class="text-sm text-slate-600 mb-2">Показать на странице:
+        <a href="{{ url_for('sim_cards_list', per_page=20, page=1, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('sim_cards_list', per_page=50, page=1, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('sim_cards_list', per_page=100, page=1, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('sim_cards_list', per_page=200, page=1, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+    </p>
+    {% endif %}
+    <div class="table-wrap">
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Телефон</th>
+            <th>ICCID</th>
+            <th>Оператор</th>
+            <th>Тариф</th>
+            <th>Описание</th>
+            <th>IP</th>
+            <th>Установлена на технике</th>
+            <th>Статус</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for s in sim_cards %}
+            <tr class="filter-row" data-search="{{ (s.phone_number ~ ' ' ~ s.iccid ~ ' ' ~ (s.ip_address or '') ~ ' ' ~ (s.operator or '') ~ ' ' ~ (s.tariff or '') ~ ' ' ~ (s.description or ''))|lower }}" data-status-id="{{ s.status_id }}" data-type-id="{{ s.machine_type_id or '' }}" data-installed="{{ 'yes' if s.machine_id else 'no' }}">
+                <td>{{ s.id }}</td>
+                <td><a href="{{ url_for('sim_card_detail', sim_id=s.id) }}">{{ s.phone_number }}</a></td>
+                <td>{{ s.iccid }}</td>
+                <td>{{ s.operator or '—' }}</td>
+                <td>{{ s.tariff or '—' }}</td>
+                <td><span class="text-slate-600" title="{{ s.description or '' }}">{{ (s.description or '—')[:40] }}{% if s.description and s.description|length > 40 %}…{% endif %}</span></td>
+                <td>{{ s.ip_address or '—' }}</td>
+                <td>
+                    {% if s.inventory_number %}
+                        <a href="{{ url_for('machine_detail', machine_id=s.machine_id) }}">{{ s.inventory_number }}</a><br>
+                        <span class="muted">{{ s.machine_model_name }}</span>
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </td>
+                <td><span data-tooltip="{{ status_hints_sim.get(s.status_name, '') }}">{{ s.status_name }}</span></td>
+                <td>
+                    <a href="{{ url_for('sim_card_edit', sim_id=s.id) }}" class="btn btn-secondary">Изменить</a>
+                    {% if not s.inventory_number %}
+                        <form method="post" action="{{ url_for('sim_card_delete', sim_id=s.id) }}" class="inline" onsubmit="return confirm('Удалить SIM-карту?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger">Удалить</button>
+                        </form>
+                    {% else %}
+                        <span class="muted" style="font-size: 11px;" title="SIM-карта установлена на технику">Удаление недоступно</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="10" class="muted">SIM-карты отсутствуют.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-2 mb-2">
+        <span>Страница {{ pagination.page }} из {{ pagination.total_pages }}. Показано {{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }}</span>
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('sim_cards_list', page=1, per_page=pagination.per_page, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="text-blue-600 hover:underline">В начало</a>
+        <a href="{{ url_for('sim_cards_list', page=pagination.page - 1, per_page=pagination.per_page, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="text-blue-600 hover:underline">← Предыдущая</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('sim_cards_list', page=pagination.page + 1, per_page=pagination.per_page, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="text-blue-600 hover:underline">Следующая →</a>
+        <a href="{{ url_for('sim_cards_list', page=pagination.total_pages, per_page=pagination.per_page, q=filter_q or '', status=filter_status if filter_status is not none else '', type=filter_type if filter_type is not none else '') }}" class="text-blue-600 hover:underline">В конец</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    <p id="sim-no-match" class="muted" style="display:none; margin-top:8px;">Нет совпадений по фильтрам (на текущей странице).</p>
+<script>
+(function(){
+    var form=document.getElementById('sim-filters');
+    if(!form) return;
+    var pageInput=form.querySelector('input[name="page"]'), search=document.getElementById('filter-search'), status=document.getElementById('filter-status'), typeFilter=document.getElementById('filter-type'), installed=document.getElementById('filter-installed'), noMatch=document.getElementById('sim-no-match');
+    var rows=document.querySelectorAll('.filter-row');
+    function applyServer(){ if(pageInput) pageInput.value='1'; form.submit(); }
+    if(search){ search.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); applyServer(); } }); }
+    if(status) status.addEventListener('change',applyServer);
+    if(typeFilter) typeFilter.addEventListener('change',applyServer);
+    function run(){
+        var i=installed&&installed.value||'';
+        var visible=0;
+        for(var k=0;k<rows.length;k++){
+            var r=rows[k], show=!i||r.getAttribute('data-installed')===i;
+            r.style.display=show?'':'none';
+            if(show) visible++;
+        }
+        if(noMatch) noMatch.style.display=(rows.length&&visible===0)?'':'none';
+    }
+    if(installed) installed.addEventListener('change',run);
+    run();
+})();
+</script>
+</div>
+{% endblock %}
+

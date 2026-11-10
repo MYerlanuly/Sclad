@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Оборудование #{{ equipment.id }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('equipment_list'), 'Оборудование'), (none, equipment.name ~ ' (' ~ (equipment.serial_number or '') ~ ')')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Оборудование #{{ equipment.id }} — {{ equipment.name }}</div>
+        <div class="no-print">
+            <button type="button" class="btn btn-secondary" onclick="window.print();">Печать</button>
+            <a href="{{ url_for('equipment_edit', equipment_id=equipment.id) }}" class="btn btn-secondary">Изменить</a>
+            <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary">К списку</a>
+        </div>
+    </div>
+    <p><strong>Серийный номер:</strong> {{ equipment.serial_number }}</p>
+    <p><strong>Статус:</strong> <span data-tooltip="{{ status_hints_equipment.get(equipment.status_name, '') }}">{{ equipment.status_name }}</span></p>
+    <p><strong>Дата добавления:</strong> <span data-tooltip="Дата добавления в систему">{{ equipment.added_at | datefmt }}</span></p>
+    {% if equipment.description %}
+        <p><strong>Описание:</strong><br>{{ equipment.description }}</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">История установок</div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>Машина</th>
+            <th>Дата установки</th>
+            <th>Дата демонтажа</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in installs %}
+            <tr>
+                <td><a href="{{ url_for('machine_detail', machine_id=row.machine_id) }}">{{ row.inventory_number }}</a></td>
+                <td><span data-tooltip="Дата установки на технику">{{ row.installed_at | datefmt }}</span></td>
+                <td><span data-tooltip="Дата снятия с техники">{{ row.removed_at | datefmt or '—' }}</span></td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="3" class="muted">Установок пока не было.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Журнал операций</div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Тип операции</th>
+            <th>Описание</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for op in logs %}
+            <tr>
+                <td>{{ op.created_at | datefmt }}</td>
+                <td>{{ op.operation_type }}</td>
+                <td>{{ op.description }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="3" class="muted">Операций пока нет.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+

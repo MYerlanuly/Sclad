@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Модели техники{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Модели техники</div>
+        <div>
+            <a href="{{ url_for('machine_model_add') }}" class="btn btn-primary">Добавить модель</a>
+            <a href="{{ url_for('machine_types_list') }}" class="btn btn-secondary">Типы</a>
+            <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">Техника</a>
+        </div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Модель</th>
+            <th>Тип</th>
+            <th>Кол-во техники</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for m in models %}
+            <tr>
+                <td>{{ m.id }}</td>
+                <td>{{ m.name }}</td>
+                <td>{{ m.type_name }}</td>
+                <td>{{ m.machines_count }}</td>
+                <td>
+                    <a href="{{ url_for('machine_model_edit', model_id=m.id) }}" class="btn btn-secondary">Изменить</a>
+                    <form method="post" action="{{ url_for('machine_model_delete', model_id=m.id) }}" class="inline" onsubmit="return confirm('Удалить модель?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="5" class="muted">Модели не заданы.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

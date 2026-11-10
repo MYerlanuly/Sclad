@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Техника{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Техника')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Техника</div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('import_page') }}" class="btn btn-secondary">Массовый ввод</a>
+            <a href="{{ url_for('export_inventory_excel') }}" class="btn btn-secondary">Экспорт в Excel</a>
+            <a href="{{ url_for('machine_add') }}" class="btn btn-primary">Добавить технику</a>
+            <a href="{{ url_for('machine_models_list') }}" class="btn btn-secondary">Модели</a>
+            <a href="{{ url_for('machine_types_list') }}" class="btn btn-secondary">Типы</a>
+        </div>
+    </div>
+    <form method="get" action="{{ url_for('machines_list') }}" class="filters flex flex-wrap items-center gap-3 mb-3" id="machines-filters">
+        <input type="hidden" name="page" value="1" id="machines-page">
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Поиск:</span>
+            <input type="text" name="q" id="filter-search" value="{{ filter_q or '' }}" placeholder="Инв. номер, модель, тип" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg w-52" autocomplete="off">
+        </label>
+        <button type="submit" class="btn btn-secondary">Поиск</button>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Тип:</span>
+            <select name="type" id="filter-type" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for t in types %}
+                    <option value="{{ t.id }}" {{ 'selected' if filter_type == t.id else '' }}>{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium text-sm">Модель:</span>
+            <select id="filter-model" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for mod in models %}
+                    <option value="{{ mod.id }}" data-type-id="{{ mod.machine_type_id }}">{{ mod.name }} ({{ mod.type_name }})</option>
+                {% endfor %}
+            </select>
+        </label>
+        <span class="flex items-center gap-2 flex-shrink-0">
+            <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">Сбросить</a>
+        </span>
+    </form>
+    {% if pagination %}
+    <p class="text-sm text-slate-600 mb-2">На странице:
+        <a href="{{ url_for('machines_list', per_page=20, page=1, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('machines_list', per_page=50, page=1, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('machines_list', per_page=100, page=1, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('machines_list', per_page=200, page=1, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+    </p>
+    {% endif %}
+    <p class="text-sm text-slate-500 mb-2">Перед удалением записей рекомендуется <a href="{{ url_for('backup_db') }}" class="text-blue-600 hover:underline">создать резервную копию БД</a>.</p>
+    <div class="table-wrap">
+    <table>
+        <thead>
+        <tr>
+            {% set cur_sort = sort|default('id') %}{% set cur_order = order|default('asc') %}
+            <th><a href="{{ url_for('machines_list', sort='inventory_number', order='desc' if cur_sort == 'inventory_number' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="text-inherit no-underline">Инв. номер {% if cur_sort == 'inventory_number' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th><a href="{{ url_for('machines_list', sort='model_name', order='desc' if cur_sort == 'model_name' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="text-inherit no-underline">Модель {% if cur_sort == 'model_name' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th><a href="{{ url_for('machines_list', sort='type_name', order='desc' if cur_sort == 'type_name' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="text-inherit no-underline">Тип {% if cur_sort == 'type_name' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for m in machines %}
+            <tr class="filter-row" data-search="{{ (m.inventory_number ~ ' ' ~ m.model_name ~ ' ' ~ m.type_name)|lower }}" data-type-id="{{ m.type_id }}" data-model-id="{{ m.model_id }}">
+                <td><a href="{{ url_for('machine_detail', machine_id=m.id) }}">{{ m.inventory_number }}</a></td>
+                <td>{{ m.model_name }}</td>
+                <td>{{ m.type_name }}</td>
+                <td>
+                    <a href="{{ url_for('machine_edit', machine_id=m.id) }}" class="btn btn-secondary">Изменить</a>
+                    <form method="post" action="{{ url_for('machine_delete', machine_id=m.id) }}" class="inline" onsubmit="return confirm('Удалить технику?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4" class="text-center py-8">
+                    <p class="muted mb-3">Техника не заведена.</p>
+                    <a href="{{ url_for('machine_add') }}" class="btn btn-primary">Добавить технику</a>
+                    <span class="mx-2 text-slate-400">или</span>
+                    <a href="{{ url_for('machine_models_list') }}" class="btn btn-secondary">Модели</a>
+                    <a href="{{ url_for('machine_types_list') }}" class="btn btn-secondary">Типы</a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-3 mb-2">
+        <span class="shrink-0">Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
+        <div class="flex gap-2">
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('machines_list', page=1, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+        <a href="{{ url_for('machines_list', page=pagination.page - 1, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('machines_list', page=pagination.page + 1, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+        <a href="{{ url_for('machines_list', page=pagination.total_pages, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('asc'), q=filter_q or '', type=filter_type if filter_type is not none else '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+        {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <p id="machines-no-match" class="muted" style="display:none; margin-top:8px;">Нет совпадений по фильтрам (на текущей странице).</p>
+<script>
+(function(){
+    var form=document.getElementById('machines-filters');
+    if(!form) return;
+    var pageInput=form.querySelector('input[name="page"]'), search=document.getElementById('filter-search'), typeSel=document.getElementById('filter-type'), modelSel=document.getElementById('filter-model'), noMatch=document.getElementById('machines-no-match');
+    var rows=document.querySelectorAll('.filter-row');
+    function applyServer(){ if(pageInput) pageInput.value='1'; form.submit(); }
+    if(search){ search.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); applyServer(); } }); }
+    if(typeSel) typeSel.addEventListener('change',function(){ filterModelOptions(); applyServer(); });
+    function filterModelOptions(){
+        var tid=typeSel&&typeSel.value||'';
+        if(!modelSel) return;
+        for(var i=0;i<modelSel.options.length;i++){
+            var opt=modelSel.options[i];
+            if(opt.value===''){ opt.style.display=''; continue; }
+            var show=!tid||opt.getAttribute('data-type-id')===tid;
+            opt.style.display=show?'':'none';
+        }
+        if(!modelSel.value||modelSel.options[modelSel.selectedIndex].style.display==='none') modelSel.value='';
+    }
+    function run(){
+        filterModelOptions();
+        var tid=typeSel&&typeSel.value||'', mid=modelSel&&modelSel.value||'';
+        var visible=0;
+        for(var k=0;k<rows.length;k++){
+            var r=rows[k];
+            var typeOk=!tid||r.getAttribute('data-type-id')===tid;
+            var modelOk=!mid||r.getAttribute('data-model-id')===mid;
+            var show=typeOk&&modelOk;
+            r.style.display=show?'':'none';
+            if(show) visible++;
+        }
+        if(noMatch) noMatch.style.display=(rows.length&&visible===0)?'':'none';
+    }
+    if(modelSel) modelSel.addEventListener('change',run);
+    run();
+})();
+</script>
+</div>
+{% endblock %}

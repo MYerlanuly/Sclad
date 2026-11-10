@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Типы техники{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Типы техники</div>
+        <div>
+            <a href="{{ url_for('machine_type_add') }}" class="btn btn-primary">Добавить тип</a>
+            <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">К технике</a>
+        </div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>Количество техники</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for t in types %}
+            <tr>
+                <td>{{ t.id }}</td>
+                <td>{{ t.name }}</td>
+                <td>{{ t.machines_count or 0 }}</td>
+                <td>
+                    <a href="{{ url_for('machine_type_edit', type_id=t.id) }}" class="btn btn-secondary">Изменить</a>
+                    <form method="post" action="{{ url_for('machine_type_delete', type_id=t.id) }}" class="inline" onsubmit="return confirm('Удалить тип техники?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4" class="muted">Типы не заданы.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+

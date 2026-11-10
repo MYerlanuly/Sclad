@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Акт о проведении технического обслуживания</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.4; color: #000; max-width: 210mm; margin: 0 auto; padding: 12mm; background: #fff; }
+        .no-print { margin-bottom: 1rem; }
+        @media print {
+            body { padding: 0; max-width: none; }
+            .no-print { display: none !important; }
+        }
+        h1 { font-size: 14pt; font-weight: bold; text-align: center; margin: 0 0 1em; }
+        .act-date { text-align: right; margin-bottom: 1.5em; }
+        table.info { width: 100%; border-collapse: collapse; margin-bottom: 1.5em; }
+        table.info th { text-align: left; padding: 4px 8px 4px 0; width: 36%; vertical-align: top; }
+        table.info td { padding: 4px 0; border-bottom: 1px solid #ccc; }
+        table.info .hand-line { border-bottom: 1px solid #000; min-height: 1.2em; }
+        .text { margin-bottom: 1em; text-align: justify; }
+        .section-title { font-weight: bold; margin: 1em 0 0.5em; font-size: 12pt; }
+        .signatures { margin-top: 2.5em; }
+        .sign-row { display: flex; align-items: flex-end; margin-bottom: 2em; }
+        .sign-label { width: 220px; flex-shrink: 0; font-size: 11pt; }
+        .sign-line { flex: 1; border-bottom: 1px solid #000; margin-left: 12px; height: 1.4em; }
+        .sign-desc { font-size: 9pt; color: #444; margin-top: 2px; margin-left: 232px; }
+        table.table-act { width: 100%; border-collapse: collapse; margin-bottom: 0.5em; font-size: 11pt; }
+        table.table-act th, table.table-act td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+        table.table-act th { font-weight: bold; }
+        table.table-act .cell-fact { min-width: 4em; }
+        .remarks-block { margin-top: 2em; }
+        .remarks-block h3 { font-size: 12pt; margin: 0 0 0.5em; }
+        .remarks-line { border-bottom: 1px solid #000; min-height: 2.5em; }
+        .muted { color: #666; }
+        a { color: #2563eb; }
+        .btn { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 14px; text-decoration: none; margin-right: 8px; border: 1px solid #cbd5e1; background: #f1f5f9; color: #1e293b; cursor: pointer; }
+        .btn-primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        {% if is_draft %}
+        <a href="{{ url_for('maintenance_add', machine_id=act.machine_id) }}" class="btn">← Назад к форме ТО</a>
+        {% else %}
+        <a href="{{ url_for('machine_detail', machine_id=act.machine_id) }}" class="btn">← Назад к технике</a>
+        {% endif %}
+        <a href="{{ url_for('maintenance_list') }}" class="btn">К списку ТО</a>
+        <button type="button" class="btn btn-primary" onclick="window.print();">Печать акта</button>
+    </div>
+
+    <h1>Акт о проведении технического обслуживания</h1>
+
+    <p class="act-date">Дата составления акта: {% if act.performed_at %}{{ act.performed_at | datefmt }}{% else %}<span class="hand-line" style="display: inline-block; min-width: 120px;">&nbsp;</span>{% endif %}</p>
+
+    <table class="info">
+        <tr>
+            <th>Объект (техника):</th>
+            <td>инв. № {{ act.inventory_number }}, {{ act.model_name }} ({{ act.type_name }})</td>
+        </tr>
+        <tr>
+            <th>Дата проведения ТО:</th>
+            <td>{% if act.performed_at %}{{ act.performed_at | datefmt }}{% else %}<span class="hand-line" style="display: inline-block; min-width: 140px;">&nbsp;</span>{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Следующее плановое ТО:</th>
+            <td>{% if act.next_due_at %}{{ act.next_due_at | datefmt }}{% else %}<span class="hand-line" style="display: inline-block; min-width: 140px;">&nbsp;</span>{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Исполнители (ФИО):</th>
+            <td><span class="hand-line" style="display: inline-block; width: 100%; min-width: 200px;">&nbsp;</span></td>
+        </tr>
+    </table>
+
+    <p class="text">Состав установленного оборудования и датчиков на дату проведения ТО.</p>
+
+    <p class="section-title">Оборудование</p>
+    <table class="table-act">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Наименование</th>
+                <th>Инв. № / серийный номер</th>
+                <th>По факту</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for eq in equipment_other %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ eq.name }}</td>
+                <td>{{ eq.serial_number or '—' }}</td>
+                <td class="cell-fact"></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="muted">Нет оборудования.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p class="section-title">Датчики (позиции)</p>
+    <table class="table-act">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Позиция — наименование</th>
+                <th>Номер (серийный)</th>
+                <th>По факту</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for eq in equipment_sensors %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ eq.position_code or '—' }} — {{ eq.name }}</td>
+                <td>{{ eq.serial_number or '—' }}</td>
+                <td class="cell-fact"></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="muted">Нет датчиков.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p class="text">Техническое обслуживание выполнено в установленные сроки. Техника допущена к эксплуатации.</p>
+
+    <div class="signatures">
+        <div class="sign-row">
+            <span class="sign-label">Ведущий инженер по АСУ</span>
+            <span class="sign-line"></span>
+        </div>
+        <div class="sign-desc">(подпись)</div>
+
+        <div class="sign-row">
+            <span class="sign-label">Инженер(ы) по АСУ</span>
+            <span class="sign-line"></span>
+        </div>
+        <div class="sign-desc">(подпись)</div>
+
+        <div class="sign-row">
+            <span class="sign-label">{{ driver_label }}</span>
+            <span class="sign-line"></span>
+        </div>
+        <div class="sign-desc">(подпись)</div>
+    </div>
+
+    <div class="remarks-block">
+        <h3>Замечания</h3>
+        {% if not is_draft and act.remarks %}
+        <p class="remarks-line" style="margin-bottom: 0.5em;">{{ act.remarks }}</p>
+        {% endif %}
+        <div class="remarks-line"></div>
+    </div>
+</body>
+</html>

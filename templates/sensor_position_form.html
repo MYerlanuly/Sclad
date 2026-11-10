@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% if position %}
+    {% set page_title = "Редактирование позиции датчика" %}
+{% else %}
+    {% set page_title = "Добавление позиции датчика" %}
+{% endif %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('sensor_positions_list'), 'Позиции датчиков'), (none, page_title)]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">{{ page_title }}</div>
+        <div>
+            <a href="{{ url_for('sensor_positions_list') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="code">Код позиции *</label>
+            <input type="text" id="code" name="code" required value="{{ (position.code if position) or '' }}" placeholder="Например: ПЛ, ПП, Топливный бак, Общий">
+        </div>
+        <div class="field">
+            <label for="position_group">Группа *</label>
+            <select id="position_group" name="position_group" required>
+                {% set group = position.position_group if position else 'wheel' %}
+                <option value="wheel" {{ 'selected' if group == 'wheel' else '' }}>Колёса (датчики давления шин)</option>
+                <option value="general" {{ 'selected' if group == 'general' else '' }}>Прочие (топливо, скорость и т.д.)</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="label">Название (подпись)</label>
+            <input type="text" id="label" name="label" value="{{ (position.label if position) or '' }}" placeholder="Например: Передний левый, Общий 1">
+        </div>
+        <div class="field">
+            <label for="sort_order">Порядок сортировки</label>
+            <input type="number" id="sort_order" name="sort_order" value="{{ (position.sort_order if position and position.sort_order is not none else '') }}" placeholder="Чем меньше число, тем выше в списке">
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('sensor_positions_list') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}
+

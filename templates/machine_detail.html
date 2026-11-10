@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Техника {{ machine.inventory_number }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('machines_list'), 'Техника'), (none, machine.inventory_number)]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Техника {{ machine.inventory_number }}</div>
+        <div class="no-print">
+            <button type="button" class="btn btn-secondary" onclick="window.print();">Печать</button>
+            <a href="{{ url_for('machine_edit', machine_id=machine.id) }}" class="btn btn-secondary">Изменить</a>
+            <a href="{{ url_for('machines_list') }}" class="btn btn-secondary">К списку</a>
+        </div>
+    </div>
+    <div class="space-y-1 text-slate-700">
+        <p><strong class="text-slate-800">Тип:</strong> {{ machine.type_name }}</p>
+        <p><strong class="text-slate-800">Модель:</strong> {{ machine.model_name }}</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Техобслуживание</div>
+        <div class="no-print"><a href="{{ url_for('maintenance_add', machine_id=machine.id) }}" class="btn btn-primary">Записать ТО</a></div>
+    </div>
+    {% if last_maintenance %}
+        <div class="space-y-1 text-slate-700">
+            <p><strong class="text-slate-800">Последнее ТО проведено:</strong> <span data-tooltip="Дата проведения последнего техобслуживания">{{ last_maintenance.performed_at | datefmt }}</span></p>
+            <p><strong class="text-slate-800">Следующее ТО:</strong> <span data-tooltip="Плановое следующее ТО">{{ last_maintenance.next_due_at | datefmt }}</span></p>
+            {% if last_maintenance.performed_by %}
+                <p><strong class="text-slate-800">Исполнители:</strong> {{ last_maintenance.performed_by }}</p>
+            {% endif %}
+            {% if last_maintenance.remarks %}
+                <p><strong class="text-slate-800">Замечания:</strong> {{ last_maintenance.remarks }}</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="muted">ТО по этой технике ещё не проводилось.</p>
+    {% endif %}
+</div>
+
+<div class="machine-detail-row" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: stretch;">
+    <div class="card" style="flex: 1; min-width: 280px; display: flex; flex-direction: column;">
+        <div class="card-header">
+            <div class="card-title">SIM-карта</div>
+            <div class="no-print">
+                {% if active_sim %}
+                    <form method="post" action="{{ url_for('remove_sim', machine_id=machine.id, link_id=active_sim.link_id) }}" class="inline" onsubmit="return confirm('Демонтировать SIM-карту?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Демонтировать</button>
+                    </form>
+                {% else %}
+                    <a href="{{ url_for('install_sim', machine_id=machine.id) }}" class="btn btn-primary">Установить SIM</a>
+                {% endif %}
+            </div>
+        </div>
+        <div style="flex: 1;">
+        {% if active_sim %}
+            <div class="space-y-1 text-slate-700">
+                <p><strong class="text-slate-800">Номер:</strong> {{ active_sim.phone_number }}</p>
+                <p><strong class="text-slate-800">ICCID:</strong> {{ active_sim.iccid }}</p>
+                <p><strong class="text-slate-800">Оператор:</strong> {{ active_sim.operator or '—' }}</p>
+                <p><strong class="text-slate-800">Тариф:</strong> {{ active_sim.tariff or '—' }}</p>
+                <p><strong class="text-slate-800">IP:</strong> {{ active_sim.ip_address or '—' }}</p>
+                <p><strong class="text-slate-800">Установлена:</strong> <span data-tooltip="Дата установки SIM на технику">{{ active_sim.installed_at | datefmt }}</span></p>
+                {% if active_sim.description %}
+                <p><strong class="text-slate-800">Описание:</strong><br><span class="text-slate-600">{{ active_sim.description }}</span></p>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="muted">SIM-карта не установлена.</p>
+        {% endif %}
+        </div>
+    </div>
+    {% if machine.type_name == 'Автосамосвал' %}
+    <div class="card" style="flex: 1; min-width: 280px; display: flex; flex-direction: column;">
+        <div class="card-header">
+            <div class="card-title">Датчики по позициям</div>
+        </div>
+        <div style="flex: 1;">
+        <div class="truck-sensors-list">
+            {% for p in positions_all %}
+                {% set s = sensors_by_position.get(p.code) %}
+                <div class="truck-sensor-row">
+                    <span class="truck-sensor-code" data-tooltip="{{ p.label or p.code }}">{{ p.code }}</span>
+                    <span class="truck-sensor-label">{{ p.label or p.code }}</span>
+                    <span class="truck-sensor-value">{% if s %}<a href="{{ url_for('equipment_detail', equipment_id=s.id) }}">{{ s.name }}</a> ({{ s.serial_number }}){% else %}—{% endif %}</span>
+                </div>
+            {% endfor %}
+        </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Оборудование</div>
+        <div class="no-print">
+            <a href="{{ url_for('install_equipment', machine_id=machine.id) }}" class="btn btn-primary">Установить оборудование</a>
+        </div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>Наименование</th>
+            <th>Серийный номер</th>
+            <th>Позиция</th>
+            <th>Установлено</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for e in equipment %}
+            <tr>
+                <td><a href="{{ url_for('equipment_detail', equipment_id=e.id) }}">{{ e.name }}</a>{% if e.get('equipment_kind') == 'sensor' %} <span class="badge">Датчик</span>{% endif %}</td>
+                <td>{{ e.serial_number }}</td>
+                <td>{% if e.get('equipment_kind') == 'sensor' %}{{ e.get('position_code') or '—' }}{% else %}—{% endif %}</td>
+                <td><span data-tooltip="Дата установки на технику">{{ e.installed_at | datefmt }}</span></td>
+                <td class="no-print">
+                    <form method="post" action="{{ url_for('remove_equipment', machine_id=machine.id, link_id=e.link_id) }}" class="inline" onsubmit="return confirm('Демонтировать оборудование?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Демонтировать</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="5" class="muted">Оборудование не установлено.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">История проведения ТО</div>
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+            <span>Показать записей:</span>
+            <select onchange="window.location=this.value" class="px-2 py-1 text-sm border border-slate-300 rounded-lg">
+                <option value="{{ url_for('machine_detail', machine_id=machine.id, maintenance_limit=20) }}" {% if maintenance_history_limit == 20 %}selected{% endif %}>20</option>
+                <option value="{{ url_for('machine_detail', machine_id=machine.id, maintenance_limit=50) }}" {% if maintenance_history_limit == 50 %}selected{% endif %}>50</option>
+                <option value="{{ url_for('machine_detail', machine_id=machine.id, maintenance_limit=100) }}" {% if maintenance_history_limit == 100 %}selected{% endif %}>100</option>
+                <option value="{{ url_for('machine_detail', machine_id=machine.id, maintenance_limit=200) }}" {% if maintenance_history_limit == 200 %}selected{% endif %}>200</option>
+                <option value="{{ url_for('machine_detail', machine_id=machine.id, maintenance_limit='all') }}" {% if maintenance_history_limit is none %}selected{% endif %}>Все</option>
+            </select>
+        </label>
+    </div>
+    {% if maintenance_history %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата проведения</th>
+                    <th>Следующее ТО</th>
+                    <th>Исполнители</th>
+                    <th>Замечания</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rec in maintenance_history %}
+                <tr>
+                    <td>{{ rec.performed_at | datefmt }}</td>
+                    <td>{{ rec.next_due_at | datefmt }}</td>
+                    <td>{{ rec.performed_by or '—' }}</td>
+                    <td class="text-slate-600">{{ rec.remarks or '—' }}</td>
+                    <td class="no-print"><a href="{{ url_for('maintenance_act', maintenance_id=rec.id) }}" class="btn btn-secondary" target="_blank" rel="noopener">Акт</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if maintenance_history_limit is not none and maintenance_history_total > maintenance_history_limit %}
+            <p class="text-slate-500 text-sm mt-2">Показаны последние {{ maintenance_history_limit }} из {{ maintenance_history_total }} записей.</p>
+        {% endif %}
+    {% else %}
+        <p class="muted">Записей о ТО нет.</p>
+    {% endif %}
+</div>
+{% endblock %}

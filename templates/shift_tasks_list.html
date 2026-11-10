@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Задания на смену{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Задания на смену')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Задания на смену</div>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">1-я смена оставляет задания для 2-й, 2-я — для 1-й. Укажите тип задания (из справочника), при необходимости — технику или оборудование. Кто поставил и кто выполнил отображаются по ФИО. <a href="{{ url_for('shift_task_types_list') }}">Типы заданий</a></p>
+
+    <form method="get" action="{{ url_for('shift_tasks_list') }}" class="filters flex flex-wrap items-center gap-3 mb-4" id="shift-tasks-filters">
+        <input type="hidden" name="page" value="1">
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Дата смены:</span>
+            <input type="date" name="date" value="{{ filter_date }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Смена:</span>
+            <select name="shift" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="day" {% if filter_shift == 'day' %}selected{% endif %}>1-я смена</option>
+                <option value="night" {% if filter_shift == 'night' %}selected{% endif %}>2-я смена</option>
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Тип:</span>
+            <select name="type" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for tt in task_types %}
+                <option value="{{ tt.id }}" {% if filter_type_id == tt.id %}selected{% endif %}>{{ tt.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium text-sm">Статус:</span>
+            <select name="status" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="pending" {% if filter_status == 'pending' %}selected{% endif %}>Ожидает</option>
+                <option value="done" {% if filter_status == 'done' %}selected{% endif %}>Выполнено</option>
+                <option value="not_done" {% if filter_status == 'not_done' %}selected{% endif %}>Не выполнено</option>
+            </select>
+        </label>
+        <button type="submit" class="btn btn-secondary">Показать</button>
+    </form>
+
+    {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
+    <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-200 bg-white">
+            <h3 class="text-base font-semibold text-slate-800 m-0">Добавить задание для смены</h3>
+        </div>
+        <form method="post" action="{{ url_for('shift_tasks_list') }}" class="p-5">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="add">
+
+            <div class="shift-add-section mb-5">
+                <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Смена и тип</div>
+                <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-width: 420px;">
+                    <div class="field mb-0">
+                        <label for="for_shift" class="text-slate-600 text-sm">Для смены *</label>
+                        <select id="for_shift" name="for_shift" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                            <option value="day">1-я смена</option>
+                            <option value="night">2-я смена</option>
+                        </select>
+                    </div>
+                    <div class="field mb-0">
+                        <label for="effective_date" class="text-slate-600 text-sm">Дата смены *</label>
+                        <input type="date" id="effective_date" name="effective_date" required value="{{ filter_date }}" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                    </div>
+                    <div class="field mb-0">
+                        <label for="task_type_id" class="text-slate-600 text-sm">Тип задания *</label>
+                        <select id="task_type_id" name="task_type_id" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                            {% for tt in task_types %}
+                            <option value="{{ tt.id }}">{{ tt.name }}</option>
+                            {% else %}
+                            <option value="">— нет типов —</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="shift-add-section mb-5">
+                <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Техника и оборудование</div>
+                <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+                    <div class="field mb-0">
+                        <label for="machine_filter" class="text-slate-600 text-sm">Техника</label>
+                        <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
+                            <input type="text" id="machine_filter" placeholder="Поиск по инв. № или модели…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
+                            <select id="machine_id" name="machine_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
+                                <option value="">— не указана —</option>
+                                {% for m in machines %}
+                                <option value="{{ m.id }}" data-search="{{ ((m.inventory_number or '') ~ ' ' ~ (m.model_name or '') ~ ' ' ~ (m.type_name or ''))|lower }}">{{ m.inventory_number }}{% if m.model_name %} — {{ m.model_name }}{% if m.type_name %} ({{ m.type_name }}){% endif %}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field mb-0">
+                        <label for="equipment_filter" class="text-slate-600 text-sm">Оборудование</label>
+                        <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
+                            <input type="text" id="equipment_filter" placeholder="Поиск по названию или серии…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
+                            <select id="equipment_id" name="equipment_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
+                                <option value="">— не указано —</option>
+                                {% for e in equipment %}
+                                <option value="{{ e.id }}" data-search="{{ ((e.name or '') ~ ' ' ~ (e.serial_number or ''))|lower }}">{{ e.name }} ({{ e.serial_number }}){% if e.equipment_kind == 'sensor' %} — датчик{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="shift-add-section">
+                <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Текст задания</div>
+                <div class="space-y-3 max-w-2xl">
+                    <div class="field mb-0">
+                        <label for="title" class="text-slate-600 text-sm">Заголовок *</label>
+                        <input type="text" id="title" name="title" required placeholder="Например: Провести ТО; Заменить датчик" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                    </div>
+                    <div class="field mb-0">
+                        <label for="description" class="text-slate-600 text-sm">Подробности</label>
+                        <input type="text" id="description" name="description" placeholder="Описание, замечания" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                    </div>
+                    <div class="pt-1">
+                        <button type="submit" class="btn btn-primary">Добавить задание</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if pagination %}
+    <p class="text-sm text-slate-600 mb-2">На странице:
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=20) }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=50) }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=100) }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=200) }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+    </p>
+    {% endif %}
+
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Смена</th>
+                <th>Тип</th>
+                <th>Задание</th>
+                <th>Техника / Оборудование</th>
+                <th>Кто поставил</th>
+                <th>Статус / Кто выполнил</th>
+                {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
+                <th></th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tasks %}
+            <tr>
+                <td>{{ t.effective_date | datefmt }}</td>
+                <td>{% if t.for_shift == 'day' %}1-я смена{% else %}2-я смена{% endif %}</td>
+                <td><span class="badge">{{ t.task_type_name or '—' }}</span></td>
+                <td>
+                    <strong>{{ t.title }}</strong>
+                    {% if t.description %}<br><span class="text-slate-600 text-sm">{{ t.description }}</span>{% endif %}
+                </td>
+                <td class="text-slate-600 text-sm">
+                    {% if t.machine_inventory_number %}
+                    <a href="{{ url_for('machine_detail', machine_id=t.machine_id) }}">{{ t.machine_inventory_number }}</a>
+                    {% endif %}
+                    {% if t.equipment_name %}
+                    {% if t.machine_inventory_number %}<br>{% endif %}
+                    <a href="{{ url_for('equipment_detail', equipment_id=t.equipment_id) }}">{{ t.equipment_name }}{% if t.equipment_serial %} ({{ t.equipment_serial }}){% endif %}</a>
+                    {% endif %}
+                    {% if not t.machine_inventory_number and not t.equipment_name %}—{% endif %}
+                </td>
+                <td class="text-slate-600">{{ t.created_by_name or '—' }}</td>
+                <td>
+                    {% if t.status == 'done' %}
+                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Выполнено</span>
+                    {% set completions = completions_by_task.get(t.id) or [] %}
+                    {% for name, completed_at, comment in completions %}
+                    <br><span class="text-slate-600 text-sm">{{ name }}{% if completed_at %} <span class="text-slate-500 text-xs">{{ completed_at | datetimefmt }}</span>{% endif %}{% if comment %} — <span class="text-slate-600 text-xs">{{ comment }}</span>{% endif %}</span>
+                    {% endfor %}
+                    {% if not completions and (t.completed_by_name or t.completed_at) %}
+                    <br><span class="text-slate-600 text-sm">{{ t.completed_by_name or '—' }}{% if t.completed_at %} <span class="text-slate-500 text-xs">{{ t.completed_at | datetimefmt }}</span>{% endif %}</span>
+                    {% endif %}
+                    {% elif t.status == 'not_done' %}
+                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Не выполнено</span>
+                    {% if t.not_done_reason %}<br><span class="text-slate-600 text-sm">{{ t.not_done_reason }}</span>{% endif %}
+                    {% if t.not_done_by_name or t.not_done_at %}<br><span class="text-slate-500 text-xs">{{ t.not_done_by_name or '—' }} {{ t.not_done_at | datetimefmt if t.not_done_at else '' }}</span>{% endif %}
+                    {% else %}
+                    <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Ожидает</span>
+                    {% endif %}
+                </td>
+                {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
+                <td class="whitespace-nowrap">
+                    {% if t.status == 'pending' %}
+                    {% if current_user.can_edit or t.created_by_user_id == current_user.id %}
+                    <a href="{{ url_for('shift_task_edit', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Изменить</a>
+                    <form method="post" action="{{ url_for('shift_task_delete', task_id=t.id) }}" class="inline" onsubmit="return confirm('Удалить задание?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Удалить</button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Выполнено</a>
+                    <a href="{{ url_for('shift_task_not_done', task_id=t.id) }}" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Не выполнено</a>
+                    {% elif t.status == 'done' and t.id not in task_ids_completed_by_me %}
+                    <a href="{{ url_for('shift_task_complete', task_id=t.id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Отметить себя</a>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{{ 8 if (current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance')) else 7 }}" class="muted">Заданий на выбранную дату и смену нет.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-3 mb-2">
+        <span class="shrink-0">Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
+        <div class="flex gap-2">
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.page - 1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.page + 1, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+        <a href="{{ url_for('shift_tasks_list', date=filter_date, shift=filter_shift or '', type=filter_type_id or '', status=filter_status or '', page=pagination.total_pages, per_page=pagination.per_page) }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+        {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+<script>
+(function() {
+    function filterSelect(filterId, selectId) {
+        var filter = document.getElementById(filterId);
+        var select = document.getElementById(selectId);
+        if (!filter || !select) return;
+        var options = Array.prototype.slice.call(select.querySelectorAll('option'));
+        filter.addEventListener('input', function() {
+            var q = (this.value || '').toLowerCase().trim();
+            options.forEach(function(opt) {
+                if (opt.value === '') { opt.hidden = false; return; }
+                var show = !q || (opt.dataset.search && opt.dataset.search.indexOf(q) !== -1);
+                opt.hidden = !show;
+            });
+        });
+    }
+    filterSelect('machine_filter', 'machine_id');
+    filterSelect('equipment_filter', 'equipment_id');
+})();
+</script>
+{% endblock %}

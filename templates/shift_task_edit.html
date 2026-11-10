@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Редактировать задание{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('shift_tasks_list'), 'Задания на смену'), (none, 'Редактировать задание')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Редактировать задание</div>
+        <div>
+            <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+    <form method="post" action="{{ url_for('shift_task_edit', task_id=task.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="shift-add-section mb-5">
+            <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Смена и тип</div>
+            <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-width: 420px;">
+                <div class="field mb-0">
+                    <label for="for_shift" class="text-slate-600 text-sm">Для смены *</label>
+                    <select id="for_shift" name="for_shift" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                        <option value="day" {% if task.for_shift == 'day' %}selected{% endif %}>1-я смена</option>
+                        <option value="night" {% if task.for_shift == 'night' %}selected{% endif %}>2-я смена</option>
+                    </select>
+                </div>
+                <div class="field mb-0">
+                    <label for="effective_date" class="text-slate-600 text-sm">Дата смены *</label>
+                    <input type="date" id="effective_date" name="effective_date" required value="{{ task.effective_date or '' }}" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                </div>
+                <div class="field mb-0">
+                    <label for="task_type_id" class="text-slate-600 text-sm">Тип задания *</label>
+                    <select id="task_type_id" name="task_type_id" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                        {% for tt in task_types %}
+                        <option value="{{ tt.id }}" {% if task.task_type_id == tt.id %}selected{% endif %}>{{ tt.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="shift-add-section mb-5">
+            <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Техника и оборудование</div>
+            <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+                <div class="field mb-0">
+                    <label for="machine_filter" class="text-slate-600 text-sm">Техника</label>
+                    <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
+                        <input type="text" id="machine_filter" placeholder="Поиск по инв. № или модели…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
+                        <select id="machine_id" name="machine_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
+                            <option value="">— не указана —</option>
+                            {% for m in machines %}
+                            <option value="{{ m.id }}" data-search="{{ ((m.inventory_number or '') ~ ' ' ~ (m.model_name or '') ~ ' ' ~ (m.type_name or ''))|lower }}" {% if task.machine_id == m.id %}selected{% endif %}>{{ m.inventory_number }}{% if m.model_name %} — {{ m.model_name }}{% if m.type_name %} ({{ m.type_name }}){% endif %}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="field mb-0">
+                    <label for="equipment_filter" class="text-slate-600 text-sm">Оборудование</label>
+                    <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
+                        <input type="text" id="equipment_filter" placeholder="Поиск по названию или серии…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
+                        <select id="equipment_id" name="equipment_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
+                            <option value="">— не указано —</option>
+                            {% for e in equipment %}
+                            <option value="{{ e.id }}" data-search="{{ ((e.name or '') ~ ' ' ~ (e.serial_number or ''))|lower }}" {% if task.equipment_id == e.id %}selected{% endif %}>{{ e.name }} ({{ e.serial_number }}){% if e.equipment_kind == 'sensor' %} — датчик{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="shift-add-section">
+            <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Текст задания</div>
+            <div class="space-y-3 max-w-2xl">
+                <div class="field mb-0">
+                    <label for="title" class="text-slate-600 text-sm">Заголовок *</label>
+                    <input type="text" id="title" name="title" required value="{{ task.title or '' }}" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                </div>
+                <div class="field mb-0">
+                    <label for="description" class="text-slate-600 text-sm">Подробности</label>
+                    <input type="text" id="description" name="description" value="{{ task.description or '' }}" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                </div>
+                <div class="pt-1">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">Отмена</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+<script>
+(function() {
+    function filterSelect(filterId, selectId) {
+        var filter = document.getElementById(filterId);
+        var select = document.getElementById(selectId);
+        if (!filter || !select) return;
+        var options = Array.prototype.slice.call(select.querySelectorAll('option'));
+        filter.addEventListener('input', function() {
+            var q = (this.value || '').toLowerCase().trim();
+            options.forEach(function(opt) {
+                if (opt.value === '') { opt.hidden = false; return; }
+                var show = !q || (opt.dataset.search && opt.dataset.search.indexOf(q) !== -1);
+                opt.hidden = !show;
+            });
+        });
+    }
+    filterSelect('machine_filter', 'machine_id');
+    filterSelect('equipment_filter', 'equipment_id');
+})();
+</script>
+{% endblock %}

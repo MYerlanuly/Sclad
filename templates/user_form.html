@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% if user %}
+    {% set page_title = "Редактирование пользователя" %}
+{% else %}
+    {% set page_title = "Добавление пользователя" %}
+{% endif %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('users_list'), 'Пользователи'), (none, 'Редактирование ' ~ user.username if user else 'Добавление')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">{{ page_title }}</div>
+        <a href="{{ url_for('users_list') }}" class="btn btn-secondary">← К списку</a>
+    </div>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="username">Логин *</label>
+            <input type="text" id="username" name="username" required
+                   value="{{ user.username if user else '' }}"
+                   {% if user %}readonly class="bg-slate-100"{% endif %}>
+            {% if user %}<p class="text-slate-500 text-sm mt-1">Логин нельзя изменить.</p>{% endif %}
+        </div>
+        {% if not user %}
+        <div class="field">
+            <label for="password">Пароль *</label>
+            <input type="password" id="password" name="password" required minlength="4" autocomplete="new-password">
+        </div>
+        {% else %}
+        <div class="field">
+            <label for="new_password">Новый пароль</label>
+            <input type="password" id="new_password" name="new_password" minlength="4" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять">
+        </div>
+        {% endif %}
+        <div class="field">
+            <label for="surname">Фамилия</label>
+            <input type="text" id="surname" name="surname" value="{{ user.surname if user else '' }}">
+        </div>
+        <div class="field">
+            <label for="first_name">Имя</label>
+            <input type="text" id="first_name" name="first_name" value="{{ user.first_name if user else '' }}">
+        </div>
+        <div class="field">
+            <label for="position">Должность</label>
+            <input type="text" id="position" name="position" value="{{ user.position if user else '' }}">
+        </div>
+        <div class="field">
+            <label for="personnel_number">Табельный номер</label>
+            <input type="text" id="personnel_number" name="personnel_number" value="{{ user.personnel_number if user else '' }}">
+        </div>
+        <div class="field">
+            <label for="role">Роль *</label>
+            <select id="role" name="role" required>
+                {% set r = user.role if user else 'reader' %}
+                <option value="reader" {% if r == 'reader' %}selected{% endif %}>Только просмотр</option>
+                <option value="maintenance" {% if r == 'maintenance' %}selected{% endif %}>ТО (запись техобслуживания)</option>
+                <option value="editor" {% if r == 'editor' %}selected{% endif %}>Редактор (склад и ТО)</option>
+                <option value="admin" {% if r == 'admin' %}selected{% endif %}>Администратор</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('users_list') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% if type_item %}
+    {% set page_title = "Редактирование типа задания" %}
+{% else %}
+    {% set page_title = "Добавление типа задания" %}
+{% endif %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('shift_tasks_list'), 'Задания на смену'), (url_for('shift_task_types_list'), 'Типы заданий'), (none, page_title)]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">{{ page_title }}</div>
+        <div>
+            <a href="{{ url_for('shift_task_types_list') }}" class="btn btn-secondary">Назад</a>
+        </div>
+    </div>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="name">Название типа *</label>
+            <input type="text" id="name" name="name" required value="{{ (type_item.name if type_item) or '' }}" placeholder="Например: ТО, Замена датчика, Неисправность">
+        </div>
+        <div class="field">
+            <label for="sort_order">Порядок сортировки</label>
+            <input type="number" id="sort_order" name="sort_order" value="{{ (type_item.sort_order if type_item and type_item.sort_order is not none else '') }}" placeholder="Чем меньше число, тем выше в списке">
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('shift_task_types_list') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

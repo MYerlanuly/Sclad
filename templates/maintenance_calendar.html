@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Календарь ТО{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('maintenance_list'), 'Техобслуживание'), (none, 'Календарь ТО')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Календарь ТО</div>
+        <div class="flex flex-wrap gap-2 items-center">
+            <form method="get" action="{{ url_for('maintenance_calendar') }}" class="flex items-center gap-2">
+                <label class="text-sm text-slate-600">Период:</label>
+                <select name="weeks" onchange="this.form.submit()" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                    <option value="2" {{ 'selected' if weeks_param == 2 else '' }}>2 недели</option>
+                    <option value="4" {{ 'selected' if weeks_param == 4 else '' }}>4 недели</option>
+                    <option value="6" {{ 'selected' if weeks_param == 6 else '' }}>6 недель</option>
+                    <option value="8" {{ 'selected' if weeks_param == 8 else '' }}>8 недель</option>
+                    <option value="12" {{ 'selected' if weeks_param == 12 else '' }}>12 недель</option>
+                </select>
+            </form>
+            <a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary">К списку ТО</a>
+            <a href="{{ url_for('maintenance_add') }}" class="btn btn-primary">Записать ТО</a>
+        </div>
+    </div>
+    <p class="text-sm text-slate-600 mb-4">Ближайшие плановые даты техобслуживания по технике.</p>
+
+    <div class="mb-6">
+        <h2 class="text-base font-semibold text-slate-800 mb-3">По дням</h2>
+        {% if days_sorted %}
+        <div class="space-y-4">
+            {% for d in days_sorted %}
+            {% set items = by_day[d] %}
+            <div class="border border-slate-200 rounded-lg overflow-hidden">
+                <div class="bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <span>{{ d }}</span>
+                    {% set d_parts = d.split('-') %}
+                    {% if d_parts | length >= 3 %}
+                    <span class="text-slate-500 font-normal">({{ d_parts[2] }} {{ month_names[d_parts[1] | int - 1] }})</span>
+                    {% endif %}
+                    {% if d == today_str %}<span class="badge" style="background: #fef3c7; color: #92400e;">Сегодня</span>{% endif %}
+                </div>
+                <ul class="divide-y divide-slate-100">
+                    {% for m in items %}
+                    <li class="px-3 py-2 flex items-center justify-between hover:bg-slate-50">
+                        <a href="{{ url_for('machine_detail', machine_id=m.machine_id) }}" class="font-medium text-slate-800 hover:text-blue-600">{{ m.inventory_number }}</a>
+                        <span class="text-sm text-slate-500">{{ m.model_name }} ({{ m.type_name }})</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-sm">В выбранном периоде нет запланированных ТО.</p>
+        {% endif %}
+    </div>
+
+    <div>
+        <h2 class="text-base font-semibold text-slate-800 mb-3">По неделям</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm">
+                <thead>
+                    <tr class="border-b border-slate-200">
+                        <th class="text-left py-2 px-2 font-semibold text-slate-700 w-28">Неделя</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Пн</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Вт</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Ср</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Чт</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Пт</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Сб</th>
+                        <th class="text-center py-2 px-1 font-semibold text-slate-600">Вс</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for week in by_week %}
+                    <tr class="border-b border-slate-100 hover:bg-slate-50/50">
+                        <td class="py-2 px-2 font-medium text-slate-700 whitespace-nowrap">{{ week.label }}</td>
+                        {% for cell in week.days %}
+                        <td class="py-1 px-1 align-top min-w-[100px] {% if cell.is_past %}bg-slate-50/50{% elif cell.is_today %}bg-amber-50/70{% endif %}">
+                            <div class="text-xs text-slate-500 mb-0.5">{% if cell.is_today %}<span class="font-medium text-amber-700">Сегодня</span>{% else %}{{ cell.label }}{% endif %}</div>
+                            {% for m in cell.machines %}
+                            <a href="{{ url_for('machine_detail', machine_id=m.machine_id) }}" class="block text-xs text-blue-600 hover:underline truncate" title="{{ m.inventory_number }} — {{ m.model_name }}">{{ m.inventory_number }}</a>
+                            {% endfor %}
+                            {% if not cell.machines %}<span class="text-slate-300 text-xs">—</span>{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

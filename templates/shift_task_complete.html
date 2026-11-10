@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Отметить выполненным{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('shift_tasks_list'), 'Задания на смену'), (none, 'Отметить выполненным')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Отметить задание выполненным</div>
+        <div>
+            <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">Задание: <strong>{{ task.title }}</strong></p>
+    <form method="post" action="{{ url_for('shift_task_complete', task_id=task.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="comment" class="text-slate-600 text-sm">Что сделано (необязательно)</label>
+            <textarea id="comment" name="comment" rows="3" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" placeholder="Кратко опишите, что было сделано"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Отметить выполненным</button>
+        <a href="{{ url_for('shift_tasks_list') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

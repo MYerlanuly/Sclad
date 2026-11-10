@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Оборудование{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Оборудование')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Оборудование</div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('import_page') }}" class="btn btn-secondary">Массовый ввод</a>
+            <a href="{{ url_for('export_inventory_excel') }}" class="btn btn-secondary">Экспорт в Excel</a>
+            <a href="{{ url_for('equipment_add') }}" class="btn btn-primary">Добавить оборудование</a>
+        </div>
+    </div>
+    <form method="get" action="{{ url_for('equipment_list') }}" class="filters flex flex-wrap items-center gap-3 mb-3" id="equipment-filters">
+        <input type="hidden" name="page" value="1">
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium">Поиск:</span>
+            <input type="text" name="q" value="{{ filter_q or '' }}" placeholder="Название, серийный номер" class="w-52 px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" autocomplete="off">
+        </label>
+        <button type="submit" class="btn btn-secondary">Поиск</button>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium">Статус:</span>
+            <select name="status" id="filter-status" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for st in statuses %}
+                    <option value="{{ st.id }}" {% if filter_status == st.id %}selected{% endif %}>{{ st.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-slate-600 font-medium">Вид:</span>
+            <select id="filter-kind" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="other">Оборудование</option>
+                <option value="sensor">Датчики</option>
+            </select>
+        </label>
+        <span class="flex items-center gap-2 flex-shrink-0">
+            <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary">Сбросить</a>
+        </span>
+    </form>
+    {% if pagination %}
+    <p class="text-sm text-slate-600 mb-2">На странице:
+        <a href="{{ url_for('equipment_list', per_page=20, page=1, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('equipment_list', per_page=50, page=1, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('equipment_list', per_page=100, page=1, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('equipment_list', per_page=200, page=1, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+    </p>
+    {% endif %}
+    <p class="text-sm text-slate-500 mb-2">Перед удалением записей рекомендуется <a href="{{ url_for('backup_db') }}" class="text-blue-600 hover:underline">создать резервную копию БД</a>.</p>
+    <div class="table-wrap">
+    <table>
+        <thead>
+        <tr>
+            {% set cur_sort = sort|default('id') %}{% set cur_order = order|default('desc') %}
+            <th><a href="{{ url_for('equipment_list', sort='id', order='desc' if cur_sort == 'id' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', status=filter_status or '') }}" class="text-inherit no-underline">ID {% if cur_sort == 'id' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th><a href="{{ url_for('equipment_list', sort='name', order='desc' if cur_sort == 'name' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', status=filter_status or '') }}" class="text-inherit no-underline">Наименование {% if cur_sort == 'name' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th><a href="{{ url_for('equipment_list', sort='serial_number', order='desc' if cur_sort == 'serial_number' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', status=filter_status or '') }}" class="text-inherit no-underline">Серийный номер {% if cur_sort == 'serial_number' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th>Вид</th>
+            <th>Установлено на</th>
+            <th><a href="{{ url_for('equipment_list', sort='status', order='desc' if cur_sort == 'status' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', status=filter_status or '') }}" class="text-inherit no-underline">Статус {% if cur_sort == 'status' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th><a href="{{ url_for('equipment_list', sort='added_at', order='desc' if cur_sort == 'added_at' and cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50, q=filter_q or '', status=filter_status or '') }}" class="text-inherit no-underline">Дата добавления {% if cur_sort == 'added_at' %}{{ '↑' if cur_order == 'asc' else '↓' }}{% endif %}</a></th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for e in equipment %}
+            <tr class="filter-row" data-search="{{ (e.name ~ ' ' ~ e.serial_number)|lower }}" data-status-id="{{ e.status_id }}" data-equipment-kind="{{ e.equipment_kind if e.equipment_kind is defined else 'other' }}">
+                <td>{{ e.id }}</td>
+                <td><a href="{{ url_for('equipment_detail', equipment_id=e.id) }}">{{ e.name }}</a></td>
+                <td>{{ e.serial_number }}</td>
+                <td>{% if e.equipment_kind == 'sensor' %}<span class="badge">Датчик</span>{% else %}—{% endif %}</td>
+                <td>
+                    {% if e.inventory_number %}
+                        <a href="{{ url_for('machine_detail', machine_id=e.machine_id) }}">{{ e.inventory_number }}</a><br>
+                        <span class="muted">{{ e.machine_model_name }}</span>
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </td>
+                <td><span data-tooltip="{{ status_hints_equipment.get(e.status_name, '') }}">{{ e.status_name }}</span></td>
+                <td>{{ e.added_at | datefmt }}</td>
+                <td>
+                    <a href="{{ url_for('equipment_edit', equipment_id=e.id) }}" class="btn btn-secondary">Изменить</a>
+                    {% if not e.inventory_number %}
+                        <form method="post" action="{{ url_for('equipment_delete', equipment_id=e.id) }}" class="inline" onsubmit="return confirm('Удалить оборудование?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger">Удалить</button>
+                        </form>
+                    {% else %}
+                        <span class="muted" style="font-size: 11px;" title="Оборудование установлено на технику">Удаление недоступно</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="8" class="text-center py-8">
+                    <p class="muted mb-3">Оборудование не заведено.</p>
+                    <a href="{{ url_for('equipment_add') }}" class="btn btn-primary">Добавить оборудование</a>
+                    <span class="mx-2 text-slate-400">или</span>
+                    <a href="{{ url_for('import_page') }}" class="btn btn-secondary">Массовый ввод</a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-3 mb-2">
+        <span class="shrink-0">Страница {{ pagination.page }} из {{ pagination.total_pages }} ({{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }})</span>
+        <div class="flex gap-2">
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('equipment_list', page=1, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В начало</a>
+        <a href="{{ url_for('equipment_list', page=pagination.page - 1, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">← Пред.</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('equipment_list', page=pagination.page + 1, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">След. →</a>
+        <a href="{{ url_for('equipment_list', page=pagination.total_pages, per_page=pagination.per_page, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8125rem;">В конец</a>
+        {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <p id="equipment-no-match" class="muted mt-2 hidden">Нет совпадений по фильтрам.</p>
+<script>
+(function(){
+    var form=document.getElementById('equipment-filters');
+    if(!form) return;
+    var search=form.querySelector('input[name="q"]'), status=document.getElementById('filter-status'), kind=document.getElementById('filter-kind'), noMatch=document.getElementById('equipment-no-match');
+    var rows=document.querySelectorAll('.filter-row');
+    var pageInput = form && form.querySelector('input[name="page"]');
+    function applyServerFilters(){
+        if(pageInput) pageInput.value='1';
+        form.submit();
+    }
+    if(search){
+        search.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); applyServerFilters(); } });
+    }
+    if(status) status.addEventListener('change', applyServerFilters);
+    function run(){
+        var k=kind&&kind.value||'';
+        var visible=0;
+        for(var j=0;j<rows.length;j++){
+            var r=rows[j], show=!k||(r.getAttribute('data-equipment-kind')||'other')===k;
+            r.style.display=show?'':'none';
+            if(show) visible++;
+        }
+        if(noMatch) noMatch.style.display=(rows.length&&visible===0)?'':'none';
+    }
+    if(kind) kind.addEventListener('change', run);
+    run();
+})();
+</script>
+</div>
+{% endblock %}
+

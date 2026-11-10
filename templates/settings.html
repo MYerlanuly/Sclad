@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Настройки')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Настройки</div>
+    </div>
+    <form method="post" action="{{ url_for('settings') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label for="maintenance_interval_months">Периодичность ТО (месяцев)</label>
+            <input type="number" id="maintenance_interval_months" name="maintenance_interval_months"
+                   value="{{ maintenance_interval_months }}" min="1" max="24" step="1"
+                   class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg" style="max-width: 120px;">
+            <p class="text-slate-500 text-sm mt-1">Следующая дата ТО при записи будет рассчитываться как дата проведения + указанное число месяцев (от 1 до 24).</p>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+    <p class="text-slate-500 text-sm mt-3">
+        Для управления позициями установки датчиков (колёса, топливный бак, общий и т.п.) используйте страницу
+        <a href="{{ url_for('sensor_positions_list') }}" class="text-blue-600 hover:underline">«Позиции датчиков»</a>.
+    </p>
+</div>
+
+<div class="card mt-6">
+    <div class="card-header">
+        <div class="card-title">Автоматическое резервное копирование БД</div>
+    </div>
+    <form method="post" action="{{ url_for('settings') }}">
+        <div class="field">
+            <label for="backup_dir">Директория для сохранения копий</label>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" id="backup_dir" name="backup_dir" value="{{ backup_dir }}"
+                   placeholder="{{ backup_root }}"
+                   class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg" style="max-width: 400px;">
+            <p class="text-slate-500 text-sm mt-1">Разрешена только папка приложения и её подпапки, например: {{ backup_root }}. Файлы: inventory_backup_ГГГГ-ММ-ДД_ЧЧ-ММ.db</p>
+        </div>
+        <div class="field">
+            <label for="backup_schedule">Расписание</label>
+            <select id="backup_schedule" name="backup_schedule" class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
+                <option value="off" {{ 'selected' if backup_schedule == 'off' else '' }}>Выключено</option>
+                <option value="daily" {{ 'selected' if backup_schedule == 'daily' else '' }}>Ежедневно</option>
+                <option value="weekly" {{ 'selected' if backup_schedule == 'weekly' else '' }}>Еженедельно</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="backup_time">Время (час:мин)</label>
+            <input type="time" id="backup_time" name="backup_time" value="{{ backup_time }}"
+                   class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
+        </div>
+        <div class="field" id="backup-weekday-wrap" style="display: {{ 'block' if backup_schedule == 'weekly' else 'none' }};">
+            <label for="backup_weekday">День недели</label>
+            <select id="backup_weekday" name="backup_weekday" class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
+                <option value="0" {{ 'selected' if backup_weekday == '0' else '' }}>Понедельник</option>
+                <option value="1" {{ 'selected' if backup_weekday == '1' else '' }}>Вторник</option>
+                <option value="2" {{ 'selected' if backup_weekday == '2' else '' }}>Среда</option>
+                <option value="3" {{ 'selected' if backup_weekday == '3' else '' }}>Четверг</option>
+                <option value="4" {{ 'selected' if backup_weekday == '4' else '' }}>Пятница</option>
+                <option value="5" {{ 'selected' if backup_weekday == '5' else '' }}>Суббота</option>
+                <option value="6" {{ 'selected' if backup_weekday == '6' else '' }}>Воскресенье</option>
+            </select>
+        </div>
+        {% if last_backup_at %}
+        <p class="text-slate-500 text-sm mb-3">Последняя копия: {{ last_backup_at }}</p>
+        {% endif %}
+        <div class="flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary">Сохранить настройки</button>
+            <button type="submit" name="backup_now" value="1" class="btn btn-secondary">Создать копию сейчас</button>
+        </div>
+    </form>
+</div>
+<script>
+(function(){
+    var sel = document.getElementById('backup_schedule');
+    var wrap = document.getElementById('backup-weekday-wrap');
+    if (!sel || !wrap) return;
+    function toggle(){
+        wrap.style.display = sel.value === 'weekly' ? 'block' : 'none';
+    }
+    sel.addEventListener('change', toggle);
+})();
+</script>
+{% endblock %}

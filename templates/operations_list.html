@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Журнал операций{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Журнал операций')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Журнал операций</div>
+        <a href="{{ url_for('operations_export_csv') }}" class="btn btn-secondary">Скачать CSV</a>
+    </div>
+    <div class="filters" id="operations-filters">
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Сущность:</span>
+            <select id="filter-entity" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="equipment">Оборудование</option>
+                <option value="sim_card">SIM-карта</option>
+                <option value="sensor">Датчик</option>
+                <option value="machine">Техника</option>
+                <option value="shift_task">Задание на смену</option>
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Операция:</span>
+            <select id="filter-operation" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="install">Установка</option>
+                <option value="remove">Демонтаж</option>
+                <option value="status_change">ТО (статус)</option>
+                <option value="create">Создание задания</option>
+                <option value="edit">Изменение задания</option>
+                <option value="delete">Удаление задания</option>
+                <option value="complete">Выполнено задание</option>
+                <option value="not_done">Не выполнено задание</option>
+            </select>
+        </label>
+        <button type="button" id="filter-reset" class="btn btn-secondary">Сбросить</button>
+    </div>
+    {% if pagination %}
+    <p class="text-sm text-slate-600 mb-2">Показать на странице:
+        <a href="{{ url_for('operations_list', per_page=20, page=1, order=order|default('desc')) }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('operations_list', per_page=50, page=1, order=order|default('desc')) }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('operations_list', per_page=100, page=1, order=order|default('desc')) }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('operations_list', per_page=200, page=1, order=order|default('desc')) }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+    </p>
+    {% endif %}
+    <table>
+        <thead>
+        <tr>
+            {% set cur_order = order|default('desc') %}
+            <th><a href="{{ url_for('operations_list', order='desc' if cur_order == 'asc' else 'asc', page=1, per_page=pagination.per_page if pagination else 50) }}" class="text-inherit no-underline">Дата {% if cur_order == 'desc' %}↓{% else %}↑{% endif %}</a></th>
+            <th>Сущность</th>
+            <th>ID сущности</th>
+            <th>Операция</th>
+            <th>Описание</th>
+            <th>Кто</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for op in operations %}
+            <tr class="filter-row" data-entity-type="{{ op.entity_type }}" data-operation-type="{{ op.operation_type }}">
+                <td>{{ op.created_at | datefmt }}</td>
+                <td>{% if op.entity_type == 'shift_task' %}Задание на смену{% elif op.entity_type == 'equipment' %}Оборудование{% elif op.entity_type == 'sim_card' %}SIM-карта{% elif op.entity_type == 'sensor' %}Датчик{% elif op.entity_type == 'machine' %}Техника{% else %}{{ op.entity_type }}{% endif %}</td>
+                <td>{{ op.entity_id }}</td>
+                <td>{% if op.operation_type == 'create' %}Создание{% elif op.operation_type == 'edit' %}Изменение{% elif op.operation_type == 'delete' %}Удаление{% elif op.operation_type == 'complete' %}Выполнено{% elif op.operation_type == 'not_done' %}Не выполнено{% elif op.operation_type == 'install' %}Установка{% elif op.operation_type == 'remove' %}Демонтаж{% elif op.operation_type == 'status_change' %}ТО (статус){% else %}{{ op.operation_type }}{% endif %}</td>
+                <td>{{ op.description }}</td>
+                <td class="text-slate-600">{{ op.username or '—' }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="6" class="muted">Операций нет.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-2 mb-2">
+        <span>Страница {{ pagination.page }} из {{ pagination.total_pages }}. Показано {{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }}</span>
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('operations_list', page=1, per_page=pagination.per_page, order=order|default('desc')) }}" class="text-blue-600 hover:underline">В начало</a>
+        <a href="{{ url_for('operations_list', page=pagination.page - 1, per_page=pagination.per_page, order=order|default('desc')) }}" class="text-blue-600 hover:underline">← Предыдущая</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('operations_list', page=pagination.page + 1, per_page=pagination.per_page, order=order|default('desc')) }}" class="text-blue-600 hover:underline">Следующая →</a>
+        <a href="{{ url_for('operations_list', page=pagination.total_pages, per_page=pagination.per_page, order=order|default('desc')) }}" class="text-blue-600 hover:underline">В конец</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    <p id="operations-no-match" class="muted mt-2 hidden">Нет совпадений по фильтрам (на текущей странице).</p>
+<script>
+(function(){
+    var entity=document.getElementById('filter-entity'), operation=document.getElementById('filter-operation'), reset=document.getElementById('filter-reset'), noMatch=document.getElementById('operations-no-match');
+    var rows=document.querySelectorAll('.filter-row');
+    function run(){
+        var e=entity&&entity.value||'', o=operation&&operation.value||'';
+        var visible=0;
+        for(var k=0;k<rows.length;k++){
+            var r=rows[k], show=(!e||r.getAttribute('data-entity-type')===e)&&(!o||r.getAttribute('data-operation-type')===o);
+            r.style.display=show?'':'none';
+            if(show) visible++;
+        }
+        if(noMatch) noMatch.style.display=(rows.length&&visible===0)?'':'none';
+    }
+    if(entity) entity.addEventListener('change',run);
+    if(operation) operation.addEventListener('change',run);
+    if(reset){ reset.addEventListener('click',function(){ if(entity) entity.value=''; if(operation) operation.value=''; run(); }); }
+    run();
+})();
+</script>
+</div>
+{% endblock %}
+

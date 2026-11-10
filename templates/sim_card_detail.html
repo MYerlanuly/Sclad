@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}SIM-карта #{{ sim_card.id }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('sim_cards_list'), 'SIM-карты'), (none, sim_card.phone_number)]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">SIM-карта #{{ sim_card.id }} — {{ sim_card.phone_number }}</div>
+        <div class="no-print">
+            <button type="button" class="btn btn-secondary" onclick="window.print();">Печать</button>
+            <a href="{{ url_for('sim_card_edit', sim_id=sim_card.id) }}" class="btn btn-secondary">Изменить</a>
+            <a href="{{ url_for('sim_cards_list') }}" class="btn btn-secondary">К списку</a>
+        </div>
+    </div>
+    <p><strong>Номер:</strong> {{ sim_card.phone_number }}</p>
+    <p><strong>ICCID:</strong> {{ sim_card.iccid }}</p>
+    <p><strong>Оператор связи:</strong> {{ sim_card.operator or '—' }}</p>
+    <p><strong>Тариф:</strong> {{ sim_card.tariff or '—' }}</p>
+    <p><strong>IP-адрес:</strong> {{ sim_card.ip_address or '—' }}</p>
+    <p><strong>Статус:</strong> <span data-tooltip="{{ status_hints_sim.get(sim_card.status_name, '') }}">{{ sim_card.status_name }}</span></p>
+    {% if sim_card.description %}
+    <p><strong>Описание:</strong><br><span class="text-slate-600">{{ sim_card.description }}</span></p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">История установок</div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>Машина</th>
+            <th>Дата установки</th>
+            <th>Дата демонтажа</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in mounts %}
+            <tr>
+                <td><a href="{{ url_for('machine_detail', machine_id=row.machine_id) }}">{{ row.inventory_number }}</a></td>
+                <td>{{ row.installed_at | datefmt }}</td>
+                <td>{{ row.removed_at | datefmt or '—' }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="3" class="muted">Установок пока не было.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Журнал операций</div>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Тип операции</th>
+            <th>Описание</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for op in logs %}
+            <tr>
+                <td>{{ op.created_at | datefmt }}</td>
+                <td>{{ op.operation_type }}</td>
+                <td>{{ op.description }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="3" class="muted">Операций пока нет.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+

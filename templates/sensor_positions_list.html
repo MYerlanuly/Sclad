@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Позиции датчиков{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Позиции датчиков')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Позиции датчиков</div>
+        <div>
+            <a href="{{ url_for('sensor_position_add') }}" class="btn btn-primary">Добавить позицию</a>
+        </div>
+    </div>
+    <p class="muted mb-2">Здесь можно добавлять и удалять позиции установки датчиков (колёса, топливный бак, общий и т.п.). Позиции, которые уже используются на технике, удалить нельзя.</p>
+    <div class="table-wrap">
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Код</th>
+            <th>Группа</th>
+            <th>Название</th>
+            <th>Порядок</th>
+            <th>Используется</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for p in positions %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.code }}</td>
+                <td>{% if p.position_group == 'wheel' %}Колёса{% elif p.position_group == 'general' %}Прочие{% else %}{{ p.position_group }}{% endif %}</td>
+                <td>{{ p.label or '' }}</td>
+                <td>{{ p.sort_order or '' }}</td>
+                <td>{% if p.used_count %}Да ({{ p.used_count }}){% else %}Нет{% endif %}</td>
+                <td>
+                    <a href="{{ url_for('sensor_position_edit', position_id=p.id) }}" class="btn btn-secondary">Изменить</a>
+                    <form method="post" action="{{ url_for('sensor_position_delete', position_id=p.id) }}" class="inline" onsubmit="return confirm('Удалить позицию?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger" {% if p.used_count %}disabled title="Нельзя удалить: позиция используется"{% endif %}>Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="7" class="muted">Позиции не заданы.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}
+

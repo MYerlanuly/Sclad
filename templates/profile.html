@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Мой профиль{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Профиль')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Мой профиль</div>
+        <a href="{{ url_for('profile_edit') }}" class="btn btn-secondary">Изменить</a>
+    </div>
+    <div class="space-y-2 text-slate-700">
+        <p><strong class="text-slate-800">Логин:</strong> {{ current_user.username }}</p>
+        <p><strong class="text-slate-800">Фамилия:</strong> {{ current_user.surname or '—' }}</p>
+        <p><strong class="text-slate-800">Имя:</strong> {{ current_user.first_name or '—' }}</p>
+        <p><strong class="text-slate-800">Должность:</strong> {{ current_user.position or '—' }}</p>
+        <p><strong class="text-slate-800">Табельный номер:</strong> {{ current_user.personnel_number or '—' }}</p>
+        <p><strong class="text-slate-800">Роль:</strong>
+            {% if current_user.role == 'admin' %}
+                Администратор
+            {% elif current_user.role == 'editor' %}
+                Редактор
+            {% elif current_user.role == 'maintenance' %}
+                ТО (запись техобслуживания)
+            {% else %}
+                Только просмотр
+            {% endif %}
+        </p>
+    </div>
+</div>
+{% endblock %}

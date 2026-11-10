@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Техобслуживание{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Техобслуживание')]) }}{% endblock %}
+{% block content %}
+<div class="card mb-6">
+    <div class="card-header">
+        <div class="card-title">Техобслуживание техники</div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('maintenance_calendar') }}" class="btn btn-secondary">Календарь ТО</a>
+            <a href="{{ url_for('maintenance_add') }}" class="btn btn-primary">Записать ТО</a>
+        </div>
+    </div>
+    <div class="mb-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-2">График: проведённые ТО по месяцам</h3>
+        <div class="bg-slate-50 rounded-lg p-4" style="max-width: 800px;">
+            <canvas id="maintenance-chart" height="120"></canvas>
+        </div>
+    </div>
+    <form method="get" action="{{ url_for('maintenance_list') }}" class="filters flex flex-wrap gap-3 items-center text-sm mb-3" id="maintenance-filters">
+        <input type="hidden" name="page" value="1">
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Тип техники:</span>
+            <select name="type" id="filter-type" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                {% for t in machine_types %}
+                    <option value="{{ t.id }}" {{ 'selected' if filter_type == t.id else '' }}>{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-slate-600 font-medium">Статус ТО:</span>
+            <select name="status" id="filter-status" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                <option value="">Все</option>
+                <option value="overdue" {{ 'selected' if filter_status == 'overdue' else '' }}>Просрочено</option>
+                <option value="due_soon" {{ 'selected' if filter_status == 'due_soon' else '' }}>Скоро ТО</option>
+                <option value="ok" {{ 'selected' if filter_status == 'ok' else '' }}>Норма</option>
+                <option value="no_data" {{ 'selected' if filter_status == 'no_data' else '' }}>Не проводилось</option>
+            </select>
+        </label>
+        <a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary">Сбросить</a>
+    </form>
+    {% if pagination %}
+    <p class="text-sm text-slate-600 mb-2">Показать на странице:
+        <a href="{{ url_for('maintenance_list', per_page=20, page=1, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="{% if pagination.per_page == 20 %}font-semibold{% endif %}">20</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('maintenance_list', per_page=50, page=1, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="{% if pagination.per_page == 50 %}font-semibold{% endif %}">50</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('maintenance_list', per_page=100, page=1, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="{% if pagination.per_page == 100 %}font-semibold{% endif %}">100</a>
+        <span class="text-slate-400">|</span>
+        <a href="{{ url_for('maintenance_list', per_page=200, page=1, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
+    </p>
+    {% endif %}
+    {% set mi = maintenance_interval_months | int %}
+    <p class="text-slate-600 text-sm mb-3">Периодичность ТО: раз в {{ mi }} {% if mi in [1, 21] %}месяц{% elif mi in [2, 3, 4, 22, 23, 24] %}месяца{% else %}месяцев{% endif %}. Список отсортирован по срокам: сначала техника с просроченным или приближающимся ТО.</p>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Инв. номер</th>
+                <th>Тип</th>
+                <th>Модель</th>
+                <th>Последнее ТО</th>
+                <th>Следующее ТО</th>
+                <th>Статус</th>
+                <th>Исполнители</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in machines %}
+            <tr class="filter-row" data-type-id="{{ m.type_id }}" data-to-status="{{ m.to_status }}">
+                <td><a href="{{ url_for('machine_detail', machine_id=m.id) }}">{{ m.inventory_number }}</a></td>
+                <td>{{ m.type_name }}</td>
+                <td>{{ m.model_name }}</td>
+                <td>{{ (m.last_performed_at | datefmt) or '—' }}</td>
+                <td>{{ (m.next_due_at | datefmt) or '—' }}</td>
+                <td>
+                    {% if m.to_status == 'overdue' %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Просрочено</span>
+                    {% elif m.to_status == 'due_soon' %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Скоро ТО</span>
+                    {% elif m.to_status == 'ok' %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Норма</span>
+                    {% else %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">Не проводилось</span>
+                    {% endif %}
+                </td>
+                <td class="text-slate-600 text-sm">{{ m.last_performed_by or '—' }}</td>
+                <td>
+                    <a href="{{ url_for('maintenance_add', machine_id=m.id) }}" class="btn btn-secondary">Записать ТО</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="muted">Нет техники в учёте.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-2 mb-2">
+        <span>Страница {{ pagination.page }} из {{ pagination.total_pages }}. Показано {{ (pagination.page - 1) * pagination.per_page + 1 }}—{{ [pagination.page * pagination.per_page, pagination.total]|min }} из {{ pagination.total }}</span>
+        {% if pagination.page > 1 %}
+        <a href="{{ url_for('maintenance_list', page=1, per_page=pagination.per_page, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="text-blue-600 hover:underline">В начало</a>
+        <a href="{{ url_for('maintenance_list', page=pagination.page - 1, per_page=pagination.per_page, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="text-blue-600 hover:underline">← Предыдущая</a>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <a href="{{ url_for('maintenance_list', page=pagination.page + 1, per_page=pagination.per_page, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="text-blue-600 hover:underline">Следующая →</a>
+        <a href="{{ url_for('maintenance_list', page=pagination.total_pages, per_page=pagination.per_page, type=filter_type if filter_type is not none else '', status=filter_status or '') }}" class="text-blue-600 hover:underline">В конец</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+<script>
+(function(){
+    var form = document.getElementById('maintenance-filters');
+    if (form) {
+        var typeSel = document.getElementById('filter-type'), statusSel = document.getElementById('filter-status');
+        var pageInput = form.querySelector('input[name="page"]');
+        function apply() { if (pageInput) pageInput.value = '1'; form.submit(); }
+        if (typeSel) typeSel.addEventListener('change', apply);
+        if (statusSel) statusSel.addEventListener('change', apply);
+    }
+})();
+</script>
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+(function(){
+    var labels = {{ chart_labels | tojson }};
+    var data = {{ chart_data | tojson }};
+    var ctx = document.getElementById('maintenance-chart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Проведено ТО',
+                data: data,
+                backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                borderColor: 'rgb(37, 99, 235)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 },
+                    title: { display: true, text: 'Количество ТО' }
+                },
+                x: {
+                    title: { display: true, text: 'Месяц' }
+                }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Установка датчика{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Установка датчика на технику {{ machine.inventory_number }}</div>
+        <div>
+            <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">Назад к технике</a>
+        </div>
+    </div>
+    {% if sensors %}
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="field">
+                <label for="sensor_id">Датчик *</label>
+                <select id="sensor_id" name="sensor_id" required>
+                    <option value="">-- выберите --</option>
+                    {% for s in sensors %}
+                        <option value="{{ s.id }}">{{ s.name }} (SN: {{ s.serial_number }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="sensor_position_id">Позиция *</label>
+                <select id="sensor_position_id" name="sensor_position_id" required>
+                    <option value="">— выберите —</option>
+                    <optgroup label="Колёса (давление шин)">
+                        {% for p in positions %}
+                            {% if p.get('position_group', 'wheel') == 'wheel' %}
+                            <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% endif %}>
+                                {{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}
+                            </option>
+                            {% endif %}
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Прочие (топливо, скорость и т.д.)">
+                        {% for p in positions %}
+                            {% if p.get('position_group') == 'general' %}
+                            <option value="{{ p.id }}" {% if p.id in used_positions %}disabled{% endif %}>
+                                {{ p.code }}{% if p.get('label') %} — {{ p.label }}{% endif %}{% if p.id in used_positions %} (занята){% endif %}
+                            </option>
+                            {% endif %}
+                        {% endfor %}
+                    </optgroup>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Установить</button>
+            <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">Отмена</a>
+        </form>
+    {% else %}
+        <p class="muted">Нет свободных датчиков «На складе».</p>
+    {% endif %}
+</div>
+{% endblock %}
+

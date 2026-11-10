@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Редактирование профиля{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('profile'), 'Профиль'), (none, 'Редактирование')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Редактирование профиля</div>
+        <a href="{{ url_for('profile') }}" class="btn btn-secondary">← Назад</a>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">Здесь можно изменить только фамилию, имя, должность и табельный номер. Логин и роль изменяет администратор.</p>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+            <label>Логин</label>
+            <input type="text" value="{{ current_user.username }}" readonly class="bg-slate-100">
+        </div>
+        <div class="field">
+            <label for="surname">Фамилия</label>
+            <input type="text" id="surname" name="surname" value="{{ current_user.surname or '' }}">
+        </div>
+        <div class="field">
+            <label for="first_name">Имя</label>
+            <input type="text" id="first_name" name="first_name" value="{{ current_user.first_name or '' }}">
+        </div>
+        <div class="field">
+            <label for="position">Должность</label>
+            <input type="text" id="position" name="position" value="{{ current_user.position or '' }}">
+        </div>
+        <div class="field">
+            <label for="personnel_number">Табельный номер</label>
+            <input type="text" id="personnel_number" name="personnel_number" value="{{ current_user.personnel_number or '' }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('profile') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

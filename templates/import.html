@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Массовый ввод{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Массовый ввод')]) }}{% endblock %}
+{% block content %}
+<div class="card mb-6">
+    <div class="card-header">
+        <div class="card-title">Массовый ввод техники, оборудования и SIM-карт</div>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">Вместо ввода по одной записи можно загрузить CSV-файл. Скачайте шаблон, заполните его в Excel или другом редакторе (разделитель столбцов — точка с запятой, кодировка UTF-8), затем загрузите файл. Дубликаты и строки с ошибками будут пропущены, в конце покажется отчёт.</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Импорт техники</div>
+            <a href="{{ url_for('import_machines_template') }}" class="btn btn-secondary">Скачать шаблон CSV</a>
+        </div>
+        <p class="text-slate-600 text-sm mb-3">Колонки: <strong>Инв. номер</strong>; <strong>Модель</strong>. Название модели должно точно совпадать с одной из моделей в справочнике (Техника → Модели техники).</p>
+        <form method="post" action="{{ url_for('import_machines') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="field">
+                <label for="machines-file">Файл CSV</label>
+                <input type="file" id="machines-file" name="file" accept=".csv,.txt" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+            </div>
+            <button type="submit" class="btn btn-primary">Загрузить и импортировать</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Импорт оборудования</div>
+            <a href="{{ url_for('import_equipment_template') }}" class="btn btn-secondary">Скачать шаблон CSV</a>
+        </div>
+        <p class="text-slate-600 text-sm mb-3">Колонки: <strong>Наименование</strong>; <strong>Серийный номер</strong>; <strong>Описание</strong> (необязательно); <strong>Статус</strong> (например «На складе»); <strong>Вид</strong> — «Датчик» или «Прочее» (если пусто — прочее). Для датчиков при установке на технику нужно будет указать позицию (колесо и т.д.).</p>
+        <form method="post" action="{{ url_for('import_equipment') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="field">
+                <label for="equipment-file">Файл CSV</label>
+                <input type="file" id="equipment-file" name="file" accept=".csv,.txt" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+            </div>
+            <button type="submit" class="btn btn-primary">Загрузить и импортировать</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Импорт SIM-карт</div>
+            <a href="{{ url_for('import_sim_cards_template') }}" class="btn btn-secondary">Скачать шаблон CSV</a>
+        </div>
+        <p class="text-slate-600 text-sm mb-3">Колонки: <strong>Номер</strong>; <strong>ICCID</strong>; <strong>IP</strong> (необязательно); <strong>Оператор</strong>; <strong>Описание</strong>; <strong>Тариф</strong>; <strong>Статус</strong> (например «На складе», по умолчанию — «На складе»). ICCID должен быть уникальным.</p>
+        <form method="post" action="{{ url_for('import_sim_cards') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="field">
+                <label for="sim-cards-file">Файл CSV</label>
+                <input type="file" id="sim-cards-file" name="file" accept=".csv,.txt" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+            </div>
+            <button type="submit" class="btn btn-primary">Загрузить и импортировать</button>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-6">
+    <div class="card-header">
+        <div class="card-title">Порядок действий</div>
+    </div>
+    <ol class="list-decimal list-inside space-y-2 text-slate-700 text-sm">
+        <li>Убедитесь, что в справочниках есть нужные <strong>типы и модели техники</strong> (если импортируете технику) — их по-прежнему добавляют вручную в разделе «Техника».</li>
+        <li>Скачайте шаблон CSV для техники, оборудования или SIM-карт.</li>
+        <li>Заполните таблицу: первая строка может быть заголовком. Для SIM-карт: Номер; ICCID; IP; Оператор; Описание; Тариф; Статус. Сохраните в формате CSV (разделитель — точка с запятой), кодировка UTF-8.</li>
+        <li>На этой странице выберите файл и нажмите «Загрузить и импортировать». Появится сообщение: сколько записей добавлено и сколько пропущено (с кратким описанием ошибок).</li>
+    </ol>
+</div>
+{% endblock %}

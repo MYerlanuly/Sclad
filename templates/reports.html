@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}Отчёты и аналитика{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Отчёты и аналитика')]) }}{% endblock %}
+{% block content %}
+<div class="card mb-8">
+    <div class="card-header">
+        <div class="card-title">Сводка по складу</div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Оборудование</p>
+            <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ warehouse_summary.equipment_total }}</p>
+            <p class="text-xs text-slate-500 mt-2">на складе {{ warehouse_summary.equipment_warehouse }} · установлено {{ warehouse_summary.equipment_installed }}{% if warehouse_summary.equipment_other %} · прочее {{ warehouse_summary.equipment_other }}{% endif %}</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Техника</p>
+            <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ warehouse_summary.machines_total }}</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">SIM-карты</p>
+            <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ warehouse_summary.sim_total }}</p>
+            <p class="text-xs text-slate-500 mt-2">на складе {{ warehouse_summary.sim_warehouse }}</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Оборудование по видам</p>
+            <ul class="text-sm text-slate-600 mt-2 space-y-0.5">
+                {% for r in equipment_by_kind %}
+                <li>{{ 'Датчики' if r.equipment_kind == 'sensor' else 'Прочее' }}: {{ r.cnt }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% if machines_by_type %}
+    <div>
+        <h3 class="text-sm font-semibold text-slate-700 mb-2">Техника по типам</h3>
+        <div class="flex flex-wrap gap-3">
+            {% for r in machines_by_type %}
+            <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700">{{ r.type_name }}: {{ r.cnt }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Оборудование по статусам</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4 flex justify-center items-center" style="min-height: 260px;">
+            {% if eq_chart_labels %}
+            <canvas id="chart-equipment" width="280" height="260"></canvas>
+            {% else %}
+            <p class="text-slate-500 text-sm">Нет данных</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">ТО по месяцам (последние 12 мес.)</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4" style="min-height: 260px;">
+            <canvas id="chart-maintenance" height="240"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Задания на смену по статусам (30 дней)</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4 flex justify-center items-center" style="min-height: 260px;">
+            {% if tasks_status_labels %}
+            <canvas id="chart-tasks-status" width="280" height="260"></canvas>
+            {% else %}
+            <p class="text-slate-500 text-sm">Нет данных</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Задания на смену по типам (30 дней)</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4" style="min-height: 260px;">
+            {% if tasks_type_labels %}
+            <canvas id="chart-tasks-type" height="240"></canvas>
+            {% else %}
+            <p class="text-slate-500 text-sm">Нет данных</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card mb-8">
+    <div class="card-header">
+        <div class="card-title">Задания по пользователям (последние 30 дней)</div>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">Кто сколько создал заданий, выполнил (отметил себя исполнителем) и отметил как не выполненные.</p>
+    {% if tasks_by_user %}
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Пользователь</th>
+                <th class="text-right">Создал заданий</th>
+                <th class="text-right">Выполнил</th>
+                <th class="text-right">Отметил не выполнено</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in tasks_by_user %}
+            <tr>
+                <td>{{ r.user_name }}</td>
+                <td class="text-right tabular-nums">{{ r.created }}</td>
+                <td class="text-right tabular-nums">{{ r.completed }}</td>
+                <td class="text-right tabular-nums">{{ r.not_done }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-sm mb-0">Нет данных за период.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Выгрузка отчёта за период</div>
+    </div>
+    <p class="text-slate-600 text-sm mb-4">Выберите тип отчёта и период (для «Операции» и «ТО» период учитывается; для «Список техники» и «Список оборудования» выгружается полный список на текущую дату). CSV в кодировке UTF-8.</p>
+    <form method="get" action="{{ url_for('reports_export') }}" class="flex flex-wrap items-end gap-4">
+        <label class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-slate-700">Тип отчёта</span>
+            <select name="type" class="px-3 py-2 text-sm border border-slate-300 rounded-lg w-48">
+                <option value="operations">Операции за период</option>
+                <option value="maintenance">ТО за период</option>
+                <option value="machines">Список техники (на дату)</option>
+                <option value="equipment">Список оборудования (на дату)</option>
+            </select>
+        </label>
+        <label class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-slate-700">Дата с</span>
+            <input type="date" name="from" value="{{ date_from_default }}" class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <label class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-slate-700">Дата по</span>
+            <input type="date" name="to" value="{{ date_to_default }}" class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
+        </label>
+        <button type="submit" class="btn btn-primary">Скачать CSV</button>
+    </form>
+</div>
+
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+(function(){
+    var colors = ['#2563eb', '#059669', '#7c3aed', '#dc2626', '#ea580c', '#ca8a04', '#0d9488', '#4f46e5'];
+    var eqLabels = {{ eq_chart_labels | tojson }};
+    var eqData = {{ eq_chart_data | tojson }};
+    var eqCtx = document.getElementById('chart-equipment');
+    if (eqCtx && eqLabels.length) {
+        new Chart(eqCtx, {
+            type: 'doughnut',
+            data: {
+                labels: eqLabels,
+                datasets: [{
+                    data: eqData,
+                    backgroundColor: colors.slice(0, eqLabels.length),
+                    borderWidth: 1,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+    var maintLabels = {{ maint_chart_labels | tojson }};
+    var maintData = {{ maint_chart_data | tojson }};
+    var maintCtx = document.getElementById('chart-maintenance');
+    if (maintCtx) {
+        new Chart(maintCtx, {
+            type: 'bar',
+            data: {
+                labels: maintLabels,
+                datasets: [{
+                    label: 'Проведено ТО',
+                    data: maintData,
+                    backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                    borderColor: 'rgb(37, 99, 235)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                    x: { maxRotation: 45 }
+                }
+            }
+        });
+    }
+    var tasksStatusLabels = {{ tasks_status_labels | tojson }};
+    var tasksStatusData = {{ tasks_status_data | tojson }};
+    var tasksStatusCtx = document.getElementById('chart-tasks-status');
+    if (tasksStatusCtx && tasksStatusLabels.length) {
+        new Chart(tasksStatusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: tasksStatusLabels,
+                datasets: [{
+                    data: tasksStatusData,
+                    backgroundColor: ['#f59e0b', '#10b981', '#ef4444'].slice(0, tasksStatusLabels.length),
+                    borderWidth: 1,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+    var tasksTypeLabels = {{ tasks_type_labels | tojson }};
+    var tasksTypeData = {{ tasks_type_data | tojson }};
+    var tasksTypeCtx = document.getElementById('chart-tasks-type');
+    if (tasksTypeCtx && tasksTypeLabels.length) {
+        new Chart(tasksTypeCtx, {
+            type: 'bar',
+            data: {
+                labels: tasksTypeLabels,
+                datasets: [{
+                    label: 'Заданий',
+                    data: tasksTypeData,
+                    backgroundColor: 'rgba(6, 182, 212, 0.6)',
+                    borderColor: 'rgb(6, 182, 212)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                    x: { maxRotation: 45 }
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

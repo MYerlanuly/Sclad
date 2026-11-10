@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Пользователи{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Пользователи')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Пользователи</div>
+        <a href="{{ url_for('user_add') }}" class="btn btn-primary">Добавить пользователя</a>
+    </div>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Логин</th>
+                <th>Фамилия</th>
+                <th>Имя</th>
+                <th>Должность</th>
+                <th>Табельный номер</th>
+                <th>Роль</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.username }}</td>
+                <td>{{ u.surname or '—' }}</td>
+                <td>{{ u.first_name or '—' }}</td>
+                <td>{{ u.position or '—' }}</td>
+                <td>{{ u.personnel_number or '—' }}</td>
+                <td>
+                    {% if u.role == 'admin' %}
+                        <span class="badge">Администратор</span>
+                    {% elif u.role == 'editor' %}
+                        <span class="badge">Редактор</span>
+                    {% elif u.role == 'maintenance' %}
+                        <span class="badge">ТО</span>
+                    {% else %}
+                        <span class="badge">Только просмотр</span>
+                    {% endif %}
+                </td>
+                <td><a href="{{ url_for('user_edit', user_id=u.id) }}" class="btn btn-secondary">Изменить</a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="muted">Пользователей нет.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+<p class="text-slate-600 text-sm mt-2">
+    <strong>Роли:</strong>
+    Администратор — полный доступ и управление пользователями;
+    Редактор — изменение данных (склад, техника, SIM, ТО);
+    ТО — только запись техобслуживания;
+    Только просмотр — просмотр без изменений.
+</p>
+{% endblock %}
