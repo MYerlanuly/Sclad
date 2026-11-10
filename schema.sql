@@ -96,18 +96,6 @@ CREATE TABLE IF NOT EXISTS sensor_positions (
     sort_order INTEGER
 );
 
-CREATE TABLE IF NOT EXISTS machine_sensors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    machine_id INTEGER NOT NULL,
-    sensor_id INTEGER NOT NULL,
-    sensor_position_id INTEGER NOT NULL,
-    installed_at TEXT NOT NULL DEFAULT (datetime('now')),
-    removed_at TEXT,
-    FOREIGN KEY (machine_id) REFERENCES machines(id),
-    FOREIGN KEY (sensor_id) REFERENCES sensors(id),
-    FOREIGN KEY (sensor_position_id) REFERENCES sensor_positions(id)
-);
-
 -- =========================
 -- 5. Equipment installation on machines
 -- =========================
@@ -126,6 +114,9 @@ CREATE TABLE IF NOT EXISTS machine_equipment (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_machine_equipment_sensor_position
     ON machine_equipment (machine_id, sensor_position_id)
     WHERE sensor_position_id IS NOT NULL AND removed_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_machine_equipment_active_equipment
+    ON machine_equipment (equipment_id)
+    WHERE removed_at IS NULL;
 
 -- =========================
 -- 6. Operations log
