@@ -348,6 +348,8 @@
     if (!block) return;
     // Форма свёрнута по умолчанию; браузер запоминает, если её раскрыли
     try { if (localStorage.getItem('shiftTasksAddOpen') === '1') block.open = true; } catch (e) {}
+    // Ссылка «+ Задание на смену» с главной открывает форму сразу
+    if (location.hash === '#add') { block.open = true; block.scrollIntoView({ block: 'start' }); }
     block.addEventListener('toggle', function() {
         try { localStorage.setItem('shiftTasksAddOpen', block.open ? '1' : '0'); } catch (e) {}
         if (block.open) document.getElementById('title').focus();

@@ -37,6 +37,35 @@ MAINTENANCE_STATUS_LABELS = {
 }
 
 
+# Последняя запись ТО по каждой машине и статус ТО (используется в списке ТО и на главной).
+MAINTENANCE_STATUS_CTE = """
+WITH last_mnt AS (
+    SELECT mnt.machine_id, mnt.next_due_at, mnt.performed_at, mnt.performed_by
+    FROM machine_maintenance mnt
+    JOIN (SELECT machine_id, MAX(id) AS id FROM machine_maintenance GROUP BY machine_id) lm
+      ON lm.id = mnt.id
+),
+to_data AS (
+    SELECT m.id, m.inventory_number, mm.name AS model_name, mt.id AS type_id, mt.name AS type_name,
+           l.next_due_at, l.performed_at AS last_performed_at, l.performed_by AS last_performed_by,
+           CAST(julianday(substr(l.next_due_at, 1, 10)) - julianday(date('now', 'localtime')) AS INTEGER) AS days_left
+    FROM machines m
+    JOIN machine_models mm ON m.machine_model_id = mm.id
+    JOIN machine_types mt ON mm.machine_type_id = mt.id
+    LEFT JOIN last_mnt l ON l.machine_id = m.id
+),
+with_status AS (
+    SELECT *, CASE
+        WHEN next_due_at IS NULL THEN 'no_data'
+        WHEN next_due_at < date('now', 'localtime') THEN 'overdue'
+        WHEN next_due_at <= date('now', 'localtime', '+14 days') THEN 'due_soon'
+        ELSE 'ok'
+    END AS to_status
+    FROM to_data
+)
+"""
+
+
 def register(app):
     @app.route("/maintenance")
     def maintenance_list():
@@ -57,32 +86,7 @@ def register(app):
         machine_types = [dict(r) for r in fetch_all("SELECT id, name FROM machine_types ORDER BY name")]
         # Последняя запись ТО по каждой машине берётся одним проходом (а не тремя
         # подзапросами на каждую строку), статус и «дней до ТО» считаются в SQL.
-        cte = """
-        WITH last_mnt AS (
-            SELECT mnt.machine_id, mnt.next_due_at, mnt.performed_at, mnt.performed_by
-            FROM machine_maintenance mnt
-            JOIN (SELECT machine_id, MAX(id) AS id FROM machine_maintenance GROUP BY machine_id) lm
-              ON lm.id = mnt.id
-        ),
-        to_data AS (
-            SELECT m.id, m.inventory_number, mm.name AS model_name, mt.id AS type_id, mt.name AS type_name,
-                   l.next_due_at, l.performed_at AS last_performed_at, l.performed_by AS last_performed_by,
-                   CAST(julianday(substr(l.next_due_at, 1, 10)) - julianday(date('now', 'localtime')) AS INTEGER) AS days_left
-            FROM machines m
-            JOIN machine_models mm ON m.machine_model_id = mm.id
-            JOIN machine_types mt ON mm.machine_type_id = mt.id
-            LEFT JOIN last_mnt l ON l.machine_id = m.id
-        ),
-        with_status AS (
-            SELECT *, CASE
-                WHEN next_due_at IS NULL THEN 'no_data'
-                WHEN next_due_at < date('now', 'localtime') THEN 'overdue'
-                WHEN next_due_at <= date('now', 'localtime', '+14 days') THEN 'due_soon'
-                ELSE 'ok'
-            END AS to_status
-            FROM to_data
-        )
-        """
+        cte = MAINTENANCE_STATUS_CTE
         # Фильтры без статуса: по ним считаются плитки-счётчики
         base_where, base_params = [], []
         if type_id is not None:
