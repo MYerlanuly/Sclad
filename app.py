@@ -738,9 +738,22 @@ def migrate_shift_tasks_status_not_done():
         if "not_done_reason" not in cols:
             conn.close()
             return True
+        # Пересоздаём таблицу только если CHECK ещё не разрешает 'not_done'.
+        # Раньше таблица пересоздавалась при каждом запуске, а с несколькими
+        # воркерами gunicorn это могло происходить одновременно.
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'shift_tasks'"
+        ).fetchone()
+        if row and row[0] and "'not_done'" in row[0]:
+            conn.execute("ROLLBACK")
+            conn.close()
+            return True
+        conn.execute("DROP TABLE IF EXISTS shift_tasks_new")
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS shift_tasks_new (
+            CREATE TABLE shift_tasks_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                 created_by_user_id INTEGER NOT NULL,
@@ -775,10 +788,15 @@ def migrate_shift_tasks_status_not_done():
         conn.execute("DROP TABLE shift_tasks")
         conn.execute("ALTER TABLE shift_tasks_new RENAME TO shift_tasks")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_shift_tasks_effective_for ON shift_tasks (effective_date, for_shift)")
-        conn.commit()
+        conn.execute("COMMIT")
         conn.close()
         return True
     except Exception as e:
+        try:
+            conn.execute("ROLLBACK")
+            conn.close()
+        except Exception:
+            pass
         print(f"Ошибка миграции shift_tasks_status_not_done: {e}")
         return False
 
@@ -919,6 +937,12 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY") or os.environ.get(
         "SECRET_KEY"
     ) or "dev-change-in-production"
+    if app.config["SECRET_KEY"] == "dev-change-in-production" or len(app.config["SECRET_KEY"]) < 32:
+        print(
+            "ВНИМАНИЕ: FLASK_SECRET_KEY не задан или короче 32 символов. "
+            "Задайте длинный случайный ключ в .env, например: "
+            "python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
     app.config["DATABASE"] = DATABASE
     CSRFProtect(app)
 
@@ -3178,7 +3202,11 @@ def create_app():
         return redirect(url_for("shift_tasks_list"))
 
     @app.route("/settings", methods=["GET", "POST"])
+    @login_required
     def settings():
+        r = _require_admin()
+        if r is not None:
+            return r
         if request.method == "POST":
             raw = (request.form.get("maintenance_interval_months") or "").strip()
             try:
@@ -4673,8 +4701,12 @@ def create_app():
     _backup_thread.start()
 
     @app.route("/backup")
+    @login_required
     def backup_db():
-        """Скачать резервную копию базы данных (консистентный снимок через SQLite backup)."""
+        """Скачать резервную копию базы данных (консистентный снимок через SQLite backup). Только admin."""
+        r = _require_admin()
+        if r is not None:
+            return r
         if not os.path.exists(DATABASE):
             flash("База данных не найдена.", "error")
             return redirect(url_for("index"))

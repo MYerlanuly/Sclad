@@ -270,7 +270,7 @@
                     </div>
                 </details>
                 <a href="{{ url_for('reports') }}" class="{% if request.endpoint == 'reports' or request.endpoint == 'reports_export' %}active{% endif %}">Отчёты</a>
-                <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">Настройки</a>
+                {% if current_user.is_authenticated and current_user.is_admin %}<a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">Настройки</a>{% endif %}
             </nav>
             {% if current_user.is_authenticated %}
             <details class="user-menu">

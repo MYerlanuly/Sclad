@@ -50,7 +50,7 @@
         <a href="{{ url_for('equipment_list', per_page=200, page=1, sort=sort|default('id'), order=order|default('desc'), q=filter_q or '', status=filter_status or '') }}" class="{% if pagination.per_page == 200 %}font-semibold{% endif %}">200</a>
     </p>
     {% endif %}
-    <p class="text-sm text-slate-500 mb-2">Перед удалением записей рекомендуется <a href="{{ url_for('backup_db') }}" class="text-blue-600 hover:underline">создать резервную копию БД</a>.</p>
+    {% if current_user.is_admin %}<p class="text-sm text-slate-500 mb-2">Перед удалением записей рекомендуется <a href="{{ url_for('backup_db') }}" class="text-blue-600 hover:underline">создать резервную копию БД</a>.</p>{% endif %}
     <div class="table-wrap">
     <table>
         <thead>
