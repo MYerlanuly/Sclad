@@ -79,3 +79,40 @@ def test_maintenance_history_filters(client_for, seed):
     # Даты перепутаны местами — меняются, а не дают пустой список
     html = c.get("/maintenance/history?date_from=2026-12-31&date_to=2026-01-01").get_data(as_text=True)
     assert "Найдено ТО: 3" in html
+
+
+def test_maintenance_list_extra_filters_and_sort(admin, seed):
+    other_type = db_exec("INSERT INTO machine_types (name) VALUES ('Экскаватор')")
+    other_model = db_exec("INSERT INTO machine_models (name, machine_type_id) VALUES ('ЭКГ-10', ?)", (other_type,))
+    m3 = db_exec("INSERT INTO machines (inventory_number, machine_model_id) VALUES ('A-100', ?)", (other_model,))
+    for mid, due, who in ((seed["machine"], "+40 days", "Иванов Пётр"), (m3, "+5 days", "Петров Иван")):
+        db_exec(
+            "INSERT INTO machine_maintenance (machine_id, performed_at, next_due_at, performed_by) "
+            "VALUES (?, date('now', 'localtime', '-50 days'), date('now', 'localtime', ?), ?)",
+            (mid, due, who),
+        )
+
+    assert _rows(admin.get(f"/maintenance?model={other_model}").get_data(as_text=True)) == ["A-100"]
+    assert _rows(admin.get("/maintenance?engineer=иванов").get_data(as_text=True)) == ["INV-001"]
+    html = admin.get("/maintenance?next_from=2000-01-01&next_to=" + "2999-01-01").get_data(as_text=True)
+    assert _rows(html) == ["A-100", "INV-001"]  # без ТО не попадает в диапазон дат
+
+    # Сортировка по инв. номеру, в обе стороны; пустые даты всегда в конце
+    assert _rows(admin.get("/maintenance?sort=inv&dir=asc").get_data(as_text=True)) == ["A-100", "INV-001", "INV-002"]
+    assert _rows(admin.get("/maintenance?sort=inv&dir=desc").get_data(as_text=True)) == ["INV-002", "INV-001", "A-100"]
+    assert _rows(admin.get("/maintenance?sort=next&dir=desc").get_data(as_text=True)) == ["INV-001", "A-100", "INV-002"]
+    # Неизвестная колонка — порядок по умолчанию; ссылки страниц сохраняют сортировку
+    assert _rows(admin.get("/maintenance?sort=drop&dir=x").get_data(as_text=True)) == ["A-100", "INV-001", "INV-002"]
+    html = admin.get("/maintenance?sort=inv&dir=desc&per_page=1").get_data(as_text=True)
+    assert "sort=inv" in html and "dir=desc" in html
+
+
+def test_maintenance_history_sort(admin, seed):
+    for mid, performed in ((seed["machine2"], "2026-02-01"), (seed["machine"], "2026-03-01")):
+        db_exec(
+            "INSERT INTO machine_maintenance (machine_id, performed_at, next_due_at) VALUES (?, ?, date(?, '+3 months'))",
+            (mid, performed, performed),
+        )
+    assert _rows(admin.get("/maintenance/history").get_data(as_text=True)) == ["INV-001", "INV-002"]
+    assert _rows(admin.get("/maintenance/history?sort=date&dir=asc").get_data(as_text=True)) == ["INV-002", "INV-001"]
+    assert _rows(admin.get("/maintenance/history?sort=inv&dir=desc").get_data(as_text=True)) == ["INV-002", "INV-001"]

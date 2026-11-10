@@ -29,6 +29,49 @@ def _history_period_presets(today):
     ]
 
 
+def _sort_order(columns, default_key, default_dir):
+    """Сортировка по клику на заголовок таблицы.
+
+    columns: ключ → SQL-выражение (или кортеж выражений). Пустые значения всегда в конце,
+    в любом направлении. Возвращает (ключ, направление, ORDER BY …, аргументы для ссылок).
+    """
+    key = (request.args.get("sort") or "").strip()
+    if key not in columns:
+        key = default_key
+    direction = (request.args.get("dir") or "").strip().lower()
+    if direction not in ("asc", "desc"):
+        direction = default_dir
+    exprs = columns[key] if isinstance(columns[key], tuple) else (columns[key],)
+    parts = []
+    for expr in exprs:
+        parts.append(f"CASE WHEN {expr} IS NULL OR {expr} = '' THEN 1 ELSE 0 END")
+        parts.append(f"{expr} {direction.upper()}")
+    args = {} if (key, direction) == (default_key, default_dir) else {"sort": key, "dir": direction}
+    return key, direction, "ORDER BY " + ", ".join(parts), args
+
+
+# Порядок статусов при сортировке по колонке «Статус»: сначала самые срочные
+_STATUS_RANK_SQL = "CASE to_status WHEN 'overdue' THEN 1 WHEN 'due_soon' THEN 2 WHEN 'ok' THEN 3 ELSE 4 END"
+
+MAINTENANCE_LIST_SORT = {
+    "inv": "inventory_number",
+    "type": ("type_name", "inventory_number"),
+    "model": ("model_name", "inventory_number"),
+    "last": ("last_performed_at", "inventory_number"),
+    "next": ("next_due_at", "inventory_number"),
+    "status": (_STATUS_RANK_SQL, "next_due_at", "inventory_number"),
+    "by": ("last_performed_by", "inventory_number"),
+}
+
+MAINTENANCE_HISTORY_SORT = {
+    "date": ("mnt.performed_at", "mnt.id"),
+    "inv": ("m.inventory_number", "mnt.performed_at"),
+    "type": ("mt.name", "mnt.performed_at"),
+    "model": ("mm.name", "mnt.performed_at"),
+    "by": ("mnt.performed_by", "mnt.performed_at"),
+    "next": ("mnt.next_due_at", "mnt.performed_at"),
+}
+
 MAINTENANCE_STATUS_LABELS = {
     "overdue": "Просрочено",
     "due_soon": "Скоро ТО",
@@ -46,7 +89,7 @@ WITH last_mnt AS (
       ON lm.id = mnt.id
 ),
 to_data AS (
-    SELECT m.id, m.inventory_number, mm.name AS model_name, mt.id AS type_id, mt.name AS type_name,
+    SELECT m.id, m.inventory_number, mm.id AS model_id, mm.name AS model_name, mt.id AS type_id, mt.name AS type_name,
            l.next_due_at, l.performed_at AS last_performed_at, l.performed_by AS last_performed_by,
            CAST(julianday(substr(l.next_due_at, 1, 10)) - julianday(date('now', 'localtime')) AS INTEGER) AS days_left
     FROM machines m
@@ -83,7 +126,21 @@ def register(app):
         if status_filter not in MAINTENANCE_STATUS_LABELS:
             status_filter = None
         filter_q = (request.args.get("q") or "").strip()[:100]
+        model_id = to_int(request.args.get("model"))
+        filter_engineer = (request.args.get("engineer") or "").strip()[:100]
+        next_from = to_iso_date(request.args.get("next_from")) or ""
+        next_to = to_iso_date(request.args.get("next_to")) or ""
+        if next_from and next_to and next_from > next_to:
+            next_from, next_to = next_to, next_from
         machine_types = [dict(r) for r in fetch_all("SELECT id, name FROM machine_types ORDER BY name")]
+        models_sql = "SELECT mm.id, mm.name, mm.machine_type_id FROM machine_models mm"
+        models_params = ()
+        if type_id is not None:
+            models_sql += " WHERE mm.machine_type_id = ?"
+            models_params = (type_id,)
+        machine_models = [dict(r) for r in fetch_all(models_sql + " ORDER BY mm.name", models_params)]
+        if model_id is not None and all(mm["id"] != model_id for mm in machine_models):
+            model_id = None  # модель не подходит к выбранному типу — сбрасываем
         # Последняя запись ТО по каждой машине берётся одним проходом (а не тремя
         # подзапросами на каждую строку), статус и «дней до ТО» считаются в SQL.
         cte = MAINTENANCE_STATUS_CTE
@@ -96,6 +153,18 @@ def register(app):
             like = f"%{filter_q.casefold()}%"
             base_where.append("(CASEFOLD(inventory_number) LIKE ? OR CASEFOLD(model_name) LIKE ?)")
             base_params.extend([like, like])
+        if model_id is not None:
+            base_where.append("model_id = ?")
+            base_params.append(model_id)
+        if filter_engineer:
+            base_where.append("CASEFOLD(COALESCE(last_performed_by, '')) LIKE ?")
+            base_params.append(f"%{filter_engineer.casefold()}%")
+        if next_from:
+            base_where.append("substr(next_due_at, 1, 10) >= ?")
+            base_params.append(next_from)
+        if next_to:
+            base_where.append("substr(next_due_at, 1, 10) <= ?")
+            base_params.append(next_to)
         base_sql = "".join(" AND " + w for w in base_where)
         status_counts = {k: 0 for k in MAINTENANCE_STATUS_LABELS}
         for r in fetch_all(
@@ -113,7 +182,8 @@ def register(app):
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = min(page, total_pages)
         offset = (page - 1) * per_page
-        order_sql = "ORDER BY CASE WHEN next_due_at IS NULL THEN 1 ELSE 0 END, next_due_at ASC, inventory_number LIMIT ? OFFSET ?"
+        sort_key, sort_dir, order_by, sort_args = _sort_order(MAINTENANCE_LIST_SORT, "next", "asc")
+        order_sql = f"{order_by} LIMIT ? OFFSET ?"
         machines = [
             dict(r)
             for r in fetch_all(
@@ -123,6 +193,12 @@ def register(app):
         ]
         for m in machines:
             m["to_status_label"] = MAINTENANCE_STATUS_LABELS.get(m.get("to_status"), "—")
+        base_args = {}
+        for key, val in (("type", type_id), ("model", model_id), ("q", filter_q), ("engineer", filter_engineer),
+                         ("next_from", next_from), ("next_to", next_to)):
+            if val not in (None, ""):
+                base_args[key] = val
+        filter_args = dict(base_args, **({"status": status_filter} if status_filter else {}))
         return render_template(
             "maintenance_list.html",
             machines=machines,
@@ -132,6 +208,17 @@ def register(app):
             filter_type=type_id,
             filter_status=status_filter or "",
             filter_q=filter_q,
+            filter_model=model_id,
+            filter_engineer=filter_engineer,
+            filter_next_from=next_from,
+            filter_next_to=next_to,
+            machine_models=machine_models,
+            engineers=_engineer_options(),
+            base_args=base_args,
+            filter_args=filter_args,
+            sort_key=sort_key,
+            sort_dir=sort_dir,
+            sort_args=sort_args,
             status_counts=status_counts,
             total_all=total_all,
             maintenance_interval_months=get_setting("maintenance_interval_months", "3"),
@@ -180,6 +267,7 @@ def register(app):
         total = fetch_one(f"SELECT COUNT(*) AS c {from_sql}{where_sql}", tuple(params))["c"]
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = min(page, total_pages)
+        sort_key, sort_dir, order_by, sort_args = _sort_order(MAINTENANCE_HISTORY_SORT, "date", "desc")
         records = [
             dict(r)
             for r in fetch_all(
@@ -187,7 +275,7 @@ def register(app):
                 SELECT mnt.id, mnt.machine_id, mnt.performed_at, mnt.next_due_at, mnt.performed_by, mnt.remarks,
                        m.inventory_number, mm.name AS model_name, mt.name AS type_name
                 {from_sql}{where_sql}
-                ORDER BY mnt.performed_at DESC, mnt.id DESC
+                {order_by}
                 LIMIT ? OFFSET ?
                 """,
                 (*params, per_page, (page - 1) * per_page),
@@ -210,6 +298,9 @@ def register(app):
             filter_q=filter_q,
             filter_engineer=filter_engineer,
             filter_args=filter_args,
+            sort_key=sort_key,
+            sort_dir=sort_dir,
+            sort_args=sort_args,
             period_presets=_history_period_presets(date.today()),
         )
 
