@@ -137,90 +137,89 @@
     {% endif %}
 
     {% if current_user.is_authenticated and (current_user.can_edit or current_user.role == 'maintenance') %}
-    <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
-        <div class="px-5 py-3 border-b border-slate-200 bg-white">
-            <h3 class="text-base font-semibold text-slate-800 m-0">Добавить задание для смены</h3>
-        </div>
-        <form method="post" action="{{ url_for('shift_tasks_list') }}" class="p-5">
+    <details id="add-task-block" class="mb-6 rounded-xl border border-slate-200 bg-white overflow-visible">
+        <summary class="px-5 py-3 cursor-pointer select-none flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-600 text-white text-sm font-bold leading-none add-task-plus">+</span>
+            <span class="text-base font-semibold text-slate-800">Добавить задание</span>
+            <span class="text-slate-500 text-xs add-task-hint">для {% if add_default_shift == 'day' %}1-й{% else %}2-й{% endif %} смены {{ add_default_date | datefmt }}</span>
+        </summary>
+        <form method="post" action="{{ url_for('shift_tasks_list', **filter_args) }}" class="px-5 pb-5 pt-1 border-t border-slate-100" id="add-task-form" autocomplete="off">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="add">
 
-            <div class="shift-add-section mb-5">
-                <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Смена и тип</div>
-                <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-width: 420px;">
-                    <div class="field mb-0">
-                        <label for="for_shift" class="text-slate-600 text-sm">Для смены *</label>
-                        <select id="for_shift" name="for_shift" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
-                            <option value="day">1-я смена</option>
-                            <option value="night">2-я смена</option>
-                        </select>
+            <div class="flex flex-wrap items-end gap-3 mt-3">
+                <div>
+                    <div class="text-slate-600 text-sm mb-1">Смена *</div>
+                    <div class="shift-toggle inline-flex rounded-lg border border-slate-300 overflow-hidden">
+                        <label><input type="radio" name="for_shift" value="day" class="sr-only" {% if add_default_shift == 'day' %}checked{% endif %}><span>1-я смена</span></label>
+                        <label><input type="radio" name="for_shift" value="night" class="sr-only" {% if add_default_shift == 'night' %}checked{% endif %}><span>2-я смена</span></label>
                     </div>
-                    <div class="field mb-0">
-                        <label for="effective_date" class="text-slate-600 text-sm">Дата смены *</label>
-                        <input type="date" id="effective_date" name="effective_date" required value="{{ filter_date }}" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
-                    </div>
-                    <div class="field mb-0">
-                        <label for="task_type_id" class="text-slate-600 text-sm">Тип задания *</label>
-                        <select id="task_type_id" name="task_type_id" required class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
-                            {% for tt in task_types %}
-                            <option value="{{ tt.id }}">{{ tt.name }}</option>
-                            {% else %}
-                            <option value="">— нет типов —</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                </div>
+                <div>
+                    <label for="effective_date" class="block text-slate-600 text-sm mb-1">Дата *</label>
+                    <input type="date" id="effective_date" name="effective_date" required value="{{ add_default_date }}" class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="task_type_id" class="block text-slate-600 text-sm mb-1">Тип *</label>
+                    <select id="task_type_id" name="task_type_id" required class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg" style="min-width: 10rem;">
+                        {% for tt in task_types %}
+                        <option value="{{ tt.id }}">{{ tt.name }}</option>
+                        {% else %}
+                        <option value="">— нет типов —</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
 
-            <div class="shift-add-section mb-5">
-                <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Техника и оборудование</div>
-                <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-                    <div class="field mb-0">
-                        <label for="machine_filter" class="text-slate-600 text-sm">Техника</label>
-                        <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
-                            <input type="text" id="machine_filter" placeholder="Поиск по инв. № или модели…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
-                            <select id="machine_id" name="machine_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
-                                <option value="">— не указана —</option>
-                                {% for m in machines %}
-                                <option value="{{ m.id }}" data-search="{{ ((m.inventory_number or '') ~ ' ' ~ (m.model_name or '') ~ ' ' ~ (m.type_name or ''))|lower }}">{{ m.inventory_number }}{% if m.model_name %} — {{ m.model_name }}{% if m.type_name %} ({{ m.type_name }}){% endif %}{% endif %}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <div class="field mb-0">
-                        <label for="equipment_filter" class="text-slate-600 text-sm">Оборудование</label>
-                        <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
-                            <input type="text" id="equipment_filter" placeholder="Начните вводить название или серийный №…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
-                            <select id="equipment_id" name="equipment_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
-                                <option value="">— не указано —</option>
-                                {% for e in equipment %}
-                                <option value="{{ e.id }}" data-search="{{ ((e.name or '') ~ ' ' ~ (e.serial_number or ''))|lower }}">{{ e.name }} ({{ e.serial_number }}){% if e.equipment_kind == 'sensor' %} — датчик{% endif %}</option>
-                                {% endfor %}
-                            </select>
-                            <div id="equipment_hint" class="text-xs text-slate-400 px-1 pt-1">Введите минимум 2 символа названия или серийного номера</div>
-                        </div>
-                    </div>
+            <div class="mt-4">
+                <label for="title" class="block text-slate-600 text-sm mb-1">Что сделать *</label>
+                <input type="text" id="title" name="title" required maxlength="200" placeholder="Например: Заменить датчик давления" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+            </div>
+
+            <div class="grid gap-3 mt-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+                <div class="combo" id="machine_combo">
+                    <label for="machine_search" class="block text-slate-600 text-sm mb-1">Техника <span class="text-slate-400">(необязательно)</span></label>
+                    <input type="hidden" name="machine_id" value="">
+                    <input type="text" id="machine_search" placeholder="Инв. № или модель…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+                    <ul class="combo-list" hidden></ul>
+                </div>
+                <div class="combo" id="equipment_combo">
+                    <label for="equipment_search" class="block text-slate-600 text-sm mb-1">Оборудование <span class="text-slate-400">(необязательно)</span></label>
+                    <input type="hidden" name="equipment_id" value="">
+                    <input type="text" id="equipment_search" placeholder="Название или серийный №…" class="combo-input w-full px-3 py-2 text-sm border border-slate-300 rounded-lg">
+                    <ul class="combo-list" hidden></ul>
                 </div>
             </div>
 
-            <div class="shift-add-section">
-                <div class="text-slate-500 text-xs font-medium uppercase tracking-wide mb-2">Текст задания</div>
-                <div class="space-y-3 max-w-2xl">
-                    <div class="field mb-0">
-                        <label for="title" class="text-slate-600 text-sm">Заголовок *</label>
-                        <input type="text" id="title" name="title" required placeholder="Например: Провести ТО; Заменить датчик" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
-                    </div>
-                    <div class="field mb-0">
-                        <label for="description" class="text-slate-600 text-sm">Подробности</label>
-                        <input type="text" id="description" name="description" placeholder="Описание, замечания" class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg">
-                    </div>
-                    <div class="pt-1">
-                        <button type="submit" class="btn btn-primary">Добавить задание</button>
-                    </div>
-                </div>
+            <div class="mt-4">
+                <label for="description" class="block text-slate-600 text-sm mb-1">Подробности <span class="text-slate-400">(необязательно)</span></label>
+                <textarea id="description" name="description" rows="2" placeholder="Описание, замечания" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"></textarea>
+            </div>
+
+            <div class="mt-4 flex items-center gap-3">
+                <button type="submit" class="btn btn-primary">Добавить задание</button>
+                <span class="text-slate-400 text-xs">Ctrl+Enter — добавить</span>
             </div>
         </form>
-    </div>
+    </details>
+    <style>
+        #add-task-block > summary { list-style: none; }
+        #add-task-block > summary::-webkit-details-marker { display: none; }
+        #add-task-block[open] .add-task-plus { transform: rotate(45deg); }
+        #add-task-block[open] .add-task-hint { display: none; }
+        .shift-toggle label { cursor: pointer; margin: 0; }
+        .shift-toggle span { display: inline-block; padding: 0.375rem 0.9rem; font-size: 0.875rem; color: #334155; background: #fff; }
+        .shift-toggle label + label span { border-left: 1px solid #cbd5e1; }
+        .shift-toggle input:checked + span { background: #2563eb; color: #fff; }
+        .shift-toggle input:focus-visible + span { outline: 2px solid #93c5fd; outline-offset: -2px; }
+        .combo { position: relative; }
+        .combo-list { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px 0; list-style: none;
+                      background: #fff; border: 1px solid #cbd5e1; border-radius: 0.5rem; box-shadow: 0 8px 20px rgba(15,23,42,.12); max-height: 16rem; overflow-y: auto; }
+        .combo-list li { padding: 0.4rem 0.75rem; font-size: 0.875rem; cursor: pointer; }
+        .combo-list li.active, .combo-list li:hover { background: #eff6ff; }
+        .combo-list li.muted { color: #94a3b8; cursor: default; background: none; }
+        .combo.selected .combo-input { border-color: #2563eb; background: #eff6ff; }
+    </style>
     {% endif %}
 
     {% if pagination %}
@@ -345,57 +344,91 @@
 </div>
 <script>
 (function() {
-    function filterSelect(filterId, selectId) {
-        var filter = document.getElementById(filterId);
-        var select = document.getElementById(selectId);
-        if (!filter || !select) return;
-        var options = Array.prototype.slice.call(select.querySelectorAll('option'));
-        filter.addEventListener('input', function() {
-            var q = (this.value || '').toLowerCase().trim();
-            options.forEach(function(opt) {
-                if (opt.value === '') { opt.hidden = false; return; }
-                var show = !q || (opt.dataset.search && opt.dataset.search.indexOf(q) !== -1);
-                opt.hidden = !show;
+    var block = document.getElementById('add-task-block');
+    if (!block) return;
+    // Форма свёрнута по умолчанию; браузер запоминает, если её раскрыли
+    try { if (localStorage.getItem('shiftTasksAddOpen') === '1') block.open = true; } catch (e) {}
+    block.addEventListener('toggle', function() {
+        try { localStorage.setItem('shiftTasksAddOpen', block.open ? '1' : '0'); } catch (e) {}
+        if (block.open) document.getElementById('title').focus();
+    });
+    var form = document.getElementById('add-task-form');
+    form.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.submit(); }
+    });
+
+    // Поле с подсказками: ввод текста -> список -> выбор кладёт id в скрытое поле
+    function combo(root, source) {
+        var input = root.querySelector('.combo-input');
+        var hidden = root.querySelector('input[type=hidden]');
+        var list = root.querySelector('.combo-list');
+        var items = [], active = -1, timer = null, seq = 0;
+        function close() { list.hidden = true; active = -1; }
+        function render(found, note) {
+            items = found;
+            list.innerHTML = '';
+            found.forEach(function(it, i) {
+                var li = document.createElement('li');
+                li.textContent = it.label;
+                li.addEventListener('mousedown', function(e) { e.preventDefault(); pick(i); });
+                list.appendChild(li);
             });
+            if (note) { var li = document.createElement('li'); li.className = 'muted'; li.textContent = note; list.appendChild(li); }
+            list.hidden = !found.length && !note;
+            active = found.length ? 0 : -1;
+            highlight();
+        }
+        function highlight() {
+            Array.prototype.forEach.call(list.children, function(li, i) { li.classList.toggle('active', i === active); });
+        }
+        function pick(i) {
+            var it = items[i];
+            if (!it) return;
+            hidden.value = it.id;
+            input.value = it.label;
+            root.classList.add('selected');
+            close();
+        }
+        input.addEventListener('input', function() {
+            hidden.value = '';
+            root.classList.remove('selected');
+            var q = input.value.trim();
+            clearTimeout(timer);
+            if (!q) { close(); return; }
+            source(q, function(found, note) { render(found, note); }, function(fn) { timer = setTimeout(fn, 250); }, ++seq, function() { return seq; });
+        });
+        input.addEventListener('keydown', function(e) {
+            if (list.hidden) return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, items.length - 1); highlight(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); highlight(); }
+            else if (e.key === 'Enter' && !e.ctrlKey && active >= 0) { e.preventDefault(); pick(active); }
+            else if (e.key === 'Escape') { close(); }
+        });
+        input.addEventListener('blur', function() {
+            close();
+            if (!hidden.value) input.value = '';
         });
     }
-    filterSelect('machine_filter', 'machine_id');
-    // Оборудование: список подгружается с сервера по мере ввода (полный список слишком большой)
-    (function() {
-        var filter = document.getElementById('equipment_filter');
-        var select = document.getElementById('equipment_id');
-        var hint = document.getElementById('equipment_hint');
-        if (!filter || !select) return;
-        var timer = null, seq = 0;
-        function setHint(text) { if (hint) hint.textContent = text; }
-        function render(items, more) {
-            var current = select.value;
-            var keep = Array.prototype.slice.call(select.options).filter(function(o) { return o.value === '' || (o.value === current && o.selected); });
-            select.innerHTML = '';
-            keep.forEach(function(o) { select.appendChild(o); });
-            items.forEach(function(it) {
-                if (String(it.id) === current) return;
-                var opt = document.createElement('option');
-                opt.value = it.id;
-                opt.textContent = it.label;
-                select.appendChild(opt);
-            });
-            setHint(items.length ? (more ? 'Показаны первые ' + items.length + ', уточните запрос' : 'Найдено: ' + items.length) : 'Ничего не найдено');
-        }
-        filter.addEventListener('input', function() {
-            var q = (filter.value || '').trim();
-            clearTimeout(timer);
-            if (q.length < 2) { setHint('Введите минимум 2 символа названия или серийного номера'); return; }
-            timer = setTimeout(function() {
-                var my = ++seq;
-                setHint('Поиск…');
-                fetch('{{ url_for("api_equipment_search") }}?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) { if (my === seq) render(data.items || [], data.more); })
-                    .catch(function() { if (my === seq) setHint('Ошибка поиска, попробуйте ещё раз'); });
-            }, 250);
+
+    var MACHINES = [{% for m in machines %}{id: {{ m.id }}, label: {{ (m.inventory_number ~ (' — ' ~ m.model_name if m.model_name else '') ~ (' (' ~ m.type_name ~ ')' if m.type_name else ''))|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+    combo(document.getElementById('machine_combo'), function(q, done) {
+        q = q.toLowerCase();
+        var found = MACHINES.filter(function(m) { return m.label.toLowerCase().indexOf(q) !== -1; });
+        done(found.slice(0, 30), found.length ? (found.length > 30 ? 'Показаны первые 30, уточните запрос' : '') : 'Ничего не найдено');
+    });
+    combo(document.getElementById('equipment_combo'), function(q, done, later, my, current) {
+        if (q.length < 2) { done([], 'Введите минимум 2 символа'); return; }
+        later(function() {
+            fetch('{{ url_for("api_equipment_search") }}?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (my !== current()) return;
+                    var found = data.items || [];
+                    done(found, found.length ? (data.more ? 'Показаны первые ' + found.length + ', уточните запрос' : '') : 'Ничего не найдено');
+                })
+                .catch(function() { if (my === current()) done([], 'Ошибка поиска, попробуйте ещё раз'); });
         });
-    })();
+    });
 })();
 </script>
 {% endblock %}

@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
+from ..shift_journal import current_shift
 from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
 from ..utils import to_int, to_iso_date
 
@@ -330,6 +331,17 @@ def register(app):
             }
         # Не закрытые задания с прошлых смен: забытые «Ожидает» и не перенесённые «Не выполнено».
         # Показываются только на сегодняшней странице.
+        # Форма добавления: по умолчанию — следующая смена после текущей
+        # (1-я смена ставит задания 2-й, 2-я — 1-й), если смотрим сегодняшний день.
+        if filter_date_from == today_str and filter_date_to == today_str:
+            cur_shift, cur_date = current_shift()
+            if cur_shift == "day":
+                add_default_shift, add_default_date = "night", cur_date
+            else:
+                add_default_shift = "day"
+                add_default_date = (date.fromisoformat(cur_date) + timedelta(days=1)).isoformat()
+        else:
+            add_default_shift, add_default_date = "day", filter_date
         open_past_tasks = []
         if filter_date_from == today_str and filter_date_to == today_str:
             open_past_tasks = [
@@ -368,6 +380,8 @@ def register(app):
             open_past_tasks=open_past_tasks,
             open_past_more=open_past_more,
             open_past_total=open_past_total,
+            add_default_shift=add_default_shift,
+            add_default_date=add_default_date,
             completions_by_task=completions_by_task,
             task_ids_completed_by_me=task_ids_completed_by_me,
             filter_shift=filter_shift,
