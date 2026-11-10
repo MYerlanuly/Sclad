@@ -97,13 +97,14 @@
                     <div class="field mb-0">
                         <label for="equipment_filter" class="text-slate-600 text-sm">Оборудование</label>
                         <div class="border border-slate-300 rounded-lg p-1.5 bg-white">
-                            <input type="text" id="equipment_filter" placeholder="Поиск по названию или серии…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
+                            <input type="text" id="equipment_filter" placeholder="Начните вводить название или серийный №…" class="w-full px-2 py-1 text-sm border-0 border-b border-slate-200 rounded-t mb-1 focus:ring-0 focus:border-primary-600" autocomplete="off">
                             <select id="equipment_id" name="equipment_id" size="5" class="w-full px-1 py-0 text-sm border-0 rounded block" style="min-height: 6.5rem;">
                                 <option value="">— не указано —</option>
                                 {% for e in equipment %}
                                 <option value="{{ e.id }}" data-search="{{ ((e.name or '') ~ ' ' ~ (e.serial_number or ''))|lower }}">{{ e.name }} ({{ e.serial_number }}){% if e.equipment_kind == 'sensor' %} — датчик{% endif %}</option>
                                 {% endfor %}
                             </select>
+                            <div id="equipment_hint" class="text-xs text-slate-400 px-1 pt-1">Введите минимум 2 символа названия или серийного номера</div>
                         </div>
                     </div>
                 </div>
@@ -257,7 +258,42 @@
         });
     }
     filterSelect('machine_filter', 'machine_id');
-    filterSelect('equipment_filter', 'equipment_id');
+    // Оборудование: список подгружается с сервера по мере ввода (полный список слишком большой)
+    (function() {
+        var filter = document.getElementById('equipment_filter');
+        var select = document.getElementById('equipment_id');
+        var hint = document.getElementById('equipment_hint');
+        if (!filter || !select) return;
+        var timer = null, seq = 0;
+        function setHint(text) { if (hint) hint.textContent = text; }
+        function render(items, more) {
+            var current = select.value;
+            var keep = Array.prototype.slice.call(select.options).filter(function(o) { return o.value === '' || (o.value === current && o.selected); });
+            select.innerHTML = '';
+            keep.forEach(function(o) { select.appendChild(o); });
+            items.forEach(function(it) {
+                if (String(it.id) === current) return;
+                var opt = document.createElement('option');
+                opt.value = it.id;
+                opt.textContent = it.label;
+                select.appendChild(opt);
+            });
+            setHint(items.length ? (more ? 'Показаны первые ' + items.length + ', уточните запрос' : 'Найдено: ' + items.length) : 'Ничего не найдено');
+        }
+        filter.addEventListener('input', function() {
+            var q = (filter.value || '').trim();
+            clearTimeout(timer);
+            if (q.length < 2) { setHint('Введите минимум 2 символа названия или серийного номера'); return; }
+            timer = setTimeout(function() {
+                var my = ++seq;
+                setHint('Поиск…');
+                fetch('{{ url_for("api_equipment_search") }}?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) { if (my === seq) render(data.items || [], data.more); })
+                    .catch(function() { if (my === seq) setHint('Ошибка поиска, попробуйте ещё раз'); });
+            }, 250);
+        });
+    })();
 })();
 </script>
 {% endblock %}

@@ -3067,12 +3067,8 @@ def create_app():
                 """
             )
         ]
-        equipment = [
-            dict(r)
-            for r in fetch_all(
-                "SELECT id, name, serial_number, equipment_kind FROM equipment ORDER BY name"
-            )
-        ]
+        # Оборудование в форму не выгружается целиком: оно подбирается поиском (/api/equipment/search)
+        equipment = []
         task_types = [dict(r) for r in fetch_all("SELECT id, name FROM shift_task_types ORDER BY sort_order, id")]
         task_ids_completed_by_me = set()
         if current_user.is_authenticated and task_ids:
@@ -3164,10 +3160,13 @@ def create_app():
                 """
             )
         ]
+        # В форму попадает только уже выбранное оборудование, остальное ищется через /api/equipment/search
         equipment = [
             dict(r)
-            for r in fetch_all("SELECT id, name, serial_number, equipment_kind FROM equipment ORDER BY name")
-        ]
+            for r in fetch_all(
+                "SELECT id, name, serial_number, equipment_kind FROM equipment WHERE id = ?", (task["equipment_id"],)
+            )
+        ] if task.get("equipment_id") else []
         task_types = [dict(r) for r in fetch_all("SELECT id, name FROM shift_task_types ORDER BY sort_order, id")]
         return render_template(
             "shift_task_edit.html",
@@ -3176,6 +3175,33 @@ def create_app():
             equipment=equipment,
             task_types=task_types,
         )
+
+    @app.route("/api/equipment/search")
+    def api_equipment_search():
+        """Поиск оборудования по названию или серийному номеру для выпадающих списков (JSON)."""
+        q = (request.args.get("q") or "").strip()[:100]
+        limit = max(1, min(50, to_int(request.args.get("limit"), 30)))
+        if len(q) < 2:
+            return {"items": [], "more": False}
+        like = f"%{q.casefold()}%"
+        rows = fetch_all(
+            """
+            SELECT id, name, serial_number, equipment_kind
+            FROM equipment
+            WHERE CASEFOLD(name) LIKE ? OR CASEFOLD(serial_number) LIKE ?
+            ORDER BY CASE WHEN CASEFOLD(serial_number) = ? THEN 0 ELSE 1 END, name, serial_number
+            LIMIT ?
+            """,
+            (like, like, q.casefold(), limit + 1),
+        )
+        items = [
+            {
+                "id": r["id"],
+                "label": f"{r['name']} ({r['serial_number']})" + (" — датчик" if r["equipment_kind"] == "sensor" else ""),
+            }
+            for r in rows[:limit]
+        ]
+        return {"items": items, "more": len(rows) > limit}
 
     @app.route("/shift_tasks/<int:task_id>/delete", methods=["POST"])
     def shift_task_delete(task_id):
