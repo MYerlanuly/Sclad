@@ -8,7 +8,7 @@ from conftest import PASSWORD, db_exec, db_query, db_scalar, login, make_app
 ALL_TABLES = (
     "equipment", "machines", "machine_types", "machine_models", "sim_cards", "machine_equipment",
     "machine_sim_cards", "machine_maintenance", "shift_tasks", "shift_task_types", "sensor_positions",
-    "users", "app_settings",
+    "users", "app_settings", "journal_entries", "journal_shift_engineers",
 )
 
 
@@ -23,10 +23,20 @@ def post_urls(app, seed):
     )
     link_eq = db_exec("INSERT INTO machine_equipment (machine_id, equipment_id) VALUES (?, ?)", (seed["machine"], seed["equipment"]))
     link_sim = db_exec("INSERT INTO machine_sim_cards (machine_id, sim_card_id) VALUES (?, ?)", (seed["machine"], seed["sim"]))
+    from sclad.shift_journal import current_shift
+
+    shift, shift_date = current_shift()
+    entry = db_exec(
+        "INSERT INTO journal_entries (shift_date, shift, entry_time, content) VALUES (?, ?, '09:00', 'Запись админа')",
+        (shift_date, shift),
+    )
+    engineer = db_exec(
+        "INSERT INTO journal_shift_engineers (shift_date, shift, name) VALUES (?, ?, 'Инженер')", (shift_date, shift)
+    )
     values = {
         "user_id": 4, "equipment_id": seed["sensor"], "position_id": 9, "type_id": seed["type"],
         "model_id": seed["model"], "machine_id": seed["machine2"], "maintenance_id": 1, "task_id": task,
-        "sim_id": seed["sim2"], "link_id": link_eq,
+        "sim_id": seed["sim2"], "link_id": link_eq, "entry_id": entry, "row_id": engineer,
     }
     special = {"shift_task_type_edit": {"type_id": seed["task_type"]}, "shift_task_type_delete": {"type_id": seed["task_type"]},
                "remove_sim": {"machine_id": seed["machine"], "link_id": link_sim},
@@ -49,6 +59,7 @@ GENERIC_FORM = {
     "password": "Pa55word!", "role": "admin", "title": "T", "for_shift": "day", "effective_date": "2026-01-01",
     "action": "add", "machine_id": "1", "performed_at": "2026-01-01", "equipment_id": "2", "sim_card_id": "2",
     "maintenance_interval_months": "7", "reason": "r", "comment": "c", "sort_order": "1",
+    "entry_time": "10:00", "content": "взлом", "note": "n", "mail_to": "x@example.kz",
 }
 
 
@@ -156,7 +167,9 @@ def test_reader_cannot_change_anything(app, seed, client_for):
 
 
 MAINTENANCE_ALLOWED = {"login", "maintenance_add", "shift_tasks_list", "shift_task_complete", "shift_task_not_done",
-                       "shift_task_edit", "shift_task_delete"}
+                       "shift_task_edit", "shift_task_delete",
+                       "journal_entry_add", "journal_entry_edit", "journal_entry_delete", "journal_engineer_add",
+                       "journal_engineer_remove"}
 
 
 def test_maintenance_limited_to_maintenance_and_shift_tasks(app, seed, client_for):

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Поиск по журналу смены{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('journal'), 'Журнал смены'), (none, 'Поиск')]) }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Поиск по журналу смены</div>
+    </div>
+    <form method="get" action="{{ url_for('journal_search') }}" class="filters flex flex-wrap items-end gap-3 mb-4">
+        <div class="field mb-0" style="min-width:220px;">
+            <label for="q">Содержание</label>
+            <input type="text" id="q" name="q" value="{{ q }}">
+        </div>
+        <div class="field mb-0" style="min-width:180px;">
+            <label for="note">Примечание</label>
+            <input type="text" id="note" name="note" value="{{ note_q }}">
+        </div>
+        <div class="field mb-0">
+            <label for="date_from">С даты</label>
+            <input type="date" id="date_from" name="date_from" value="{{ date_from }}" max="{{ today }}">
+        </div>
+        <div class="field mb-0">
+            <label for="date_to">По дату</label>
+            <input type="date" id="date_to" name="date_to" value="{{ date_to }}" max="{{ today }}">
+        </div>
+        <div class="field mb-0">
+            <label for="shift">Смена</label>
+            <select id="shift" name="shift">
+                <option value="">Все</option>
+                {% for code, label in shift_labels.items() %}
+                <option value="{{ code }}" {% if shift == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Найти</button>
+        <a href="{{ url_for('journal_search') }}" class="btn btn-secondary">Сбросить</a>
+    </form>
+
+    {% if searched %}
+    <p class="text-slate-600 text-sm mb-2">Найдено записей: {{ total }}</p>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Дата</th><th>Смена</th><th>Время</th><th>Содержание</th><th>Примечание</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+            <tr>
+                <td><a href="{{ url_for('journal', date=r.shift_date, shift=r.shift) }}">{{ r.shift_date | datefmt }}</a></td>
+                <td>{{ shift_labels[r.shift] }}</td>
+                <td>{{ r.entry_time }}</td>
+                <td style="white-space:pre-line;">{{ r.content }}</td>
+                <td style="white-space:pre-line;">{{ r.note }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5" class="text-slate-500">Ничего не найдено.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if total_pages > 1 %}
+    <p class="flex items-center gap-3 mt-3 text-sm">
+        <span>Страница {{ page }} из {{ total_pages }}</span>
+        {% if page > 1 %}<a href="{{ url_for('journal_search', q=q, note=note_q, date_from=date_from, date_to=date_to, shift=shift, page=page-1) }}" class="text-blue-600 hover:underline">← Назад</a>{% endif %}
+        {% if page < total_pages %}<a href="{{ url_for('journal_search', q=q, note=note_q, date_from=date_from, date_to=date_to, shift=shift, page=page+1) }}" class="text-blue-600 hover:underline">Далее →</a>{% endif %}
+    </p>
+    {% endif %}
+    {% else %}
+    <p class="text-slate-500 text-sm">Введите текст или выберите даты и нажмите «Найти».</p>
+    {% endif %}
+</div>
+{% endblock %}

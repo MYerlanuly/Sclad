@@ -17,6 +17,8 @@
                 <option value="sensor">Датчик</option>
                 <option value="machine">Техника</option>
                 <option value="shift_task">Задание на смену</option>
+                <option value="journal_entry">Запись журнала смены</option>
+                <option value="journal_engineer">Инженер на смене</option>
             </select>
         </label>
         <label class="flex items-center gap-2">
@@ -62,7 +64,7 @@
         {% for op in operations %}
             <tr class="filter-row" data-entity-type="{{ op.entity_type }}" data-operation-type="{{ op.operation_type }}">
                 <td>{{ op.created_at | datefmt }}</td>
-                <td>{% if op.entity_type == 'shift_task' %}Задание на смену{% elif op.entity_type == 'equipment' %}Оборудование{% elif op.entity_type == 'sim_card' %}SIM-карта{% elif op.entity_type == 'sensor' %}Датчик{% elif op.entity_type == 'machine' %}Техника{% else %}{{ op.entity_type }}{% endif %}</td>
+                <td>{% if op.entity_type == 'shift_task' %}Задание на смену{% elif op.entity_type == 'equipment' %}Оборудование{% elif op.entity_type == 'sim_card' %}SIM-карта{% elif op.entity_type == 'sensor' %}Датчик{% elif op.entity_type == 'machine' %}Техника{% elif op.entity_type == 'journal_entry' %}Запись журнала смены{% elif op.entity_type == 'journal_engineer' %}Инженер на смене{% else %}{{ op.entity_type }}{% endif %}</td>
                 <td>{{ op.entity_id }}</td>
                 <td>{% if op.operation_type == 'create' %}Создание{% elif op.operation_type == 'edit' %}Изменение{% elif op.operation_type == 'delete' %}Удаление{% elif op.operation_type == 'complete' %}Выполнено{% elif op.operation_type == 'not_done' %}Не выполнено{% elif op.operation_type == 'install' %}Установка{% elif op.operation_type == 'remove' %}Демонтаж{% elif op.operation_type == 'status_change' %}ТО (статус){% else %}{{ op.operation_type }}{% endif %}</td>
                 <td>{{ op.description }}</td>

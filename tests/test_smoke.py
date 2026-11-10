@@ -27,6 +27,13 @@ def _full_seed(seed):
         "INSERT INTO operations_log (operation_type, entity_type, entity_id, description, username) VALUES ('install', 'equipment', ?, 'тест', 'admin')",
         (seed["equipment"],),
     )
+    from sclad.shift_journal import current_shift
+
+    shift, shift_date = current_shift()
+    ids["entry"] = db_exec(
+        "INSERT INTO journal_entries (shift_date, shift, entry_time, content) VALUES (?, ?, '09:00', 'Запись')",
+        (shift_date, shift),
+    )
     return ids
 
 
@@ -41,6 +48,7 @@ ARG_SOURCES = {
     "task_id": lambda ids: ids["task"],
     "sim_id": lambda ids: ids["sim"],
     "link_id": lambda ids: ids["link_eq"],
+    "entry_id": lambda ids: ids["entry"],
 }
 
 # Маршруты, у которых id в URL относится к другой таблице

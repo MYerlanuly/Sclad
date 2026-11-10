@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Изменить запись журнала{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('journal', date=entry.shift_date, shift=entry.shift), 'Журнал смены'), (none, 'Изменить запись')]) }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width: 720px;">
+    <div class="card-header">
+        <div class="card-title">Изменить запись: {{ title }}</div>
+    </div>
+    <form method="post" action="{{ url_for('journal_entry_edit', entry_id=entry.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field" style="max-width:140px;">
+            <label for="entry_time">Время *</label>
+            <input type="text" id="entry_time" name="entry_time" value="{{ entry.entry_time }}" required pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ">
+        </div>
+        <div class="field">
+            <label for="content">Содержание *</label>
+            <textarea id="content" name="content" required rows="4">{{ entry.content }}</textarea>
+        </div>
+        <div class="field">
+            <label for="note">Примечание</label>
+            <textarea id="note" name="note" rows="3">{{ entry.note }}</textarea>
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <a href="{{ url_for('journal', date=entry.shift_date, shift=entry.shift) }}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

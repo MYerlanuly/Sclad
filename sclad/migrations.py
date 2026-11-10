@@ -738,6 +738,51 @@ def migrate_shift_tasks_status_not_done():
         return False
 
 
+def migrate_shift_journal():
+    """Журнал смены (перенесён из отдельной программы «Журнал инженеров по АСУ»)."""
+    if not os.path.exists(DATABASE):
+        return False
+    conn = sqlite3.connect(DATABASE)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_date TEXT NOT NULL,
+                shift TEXT NOT NULL CHECK (shift IN ('day', 'night')),
+                entry_time TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                created_by_user_id INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT,
+                FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_journal_entries_shift ON journal_entries (shift_date, shift);
+            CREATE TABLE IF NOT EXISTS journal_shift_engineers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                shift_date TEXT NOT NULL,
+                shift TEXT NOT NULL CHECK (shift IN ('day', 'night')),
+                name TEXT NOT NULL,
+                user_id INTEGER,
+                UNIQUE (shift_date, shift, name),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            """
+        )
+        # Адресаты письма по умолчанию — те же, что были в программе журнала
+        conn.execute(
+            "INSERT OR IGNORE INTO app_settings (key, value) VALUES ('journal_mail_to', 'v.ustimenko@bogatyr.kz')"
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO app_settings (key, value) VALUES ('journal_mail_cc', 'asutp01@bogatyr.kz')"
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 MIGRATIONS = (
     migrate_equipment_unique_constraint,
     migrate_sensor_positions_group,
@@ -759,6 +804,7 @@ MIGRATIONS = (
     migrate_shift_task_completions,
     migrate_shift_task_done_comment_and_not_done,
     migrate_shift_tasks_status_not_done,
+    migrate_shift_journal,
 )
 
 

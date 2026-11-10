@@ -109,9 +109,15 @@ def register(app):
                     "shift_task_not_done",
                     "shift_task_edit",
                     "shift_task_delete",
+                    # Журнал смены
+                    "journal_entry_add",
+                    "journal_entry_edit",
+                    "journal_entry_delete",
+                    "journal_engineer_add",
+                    "journal_engineer_remove",
                 }
                 if request.endpoint not in allowed_endpoints:
-                    flash("Этому пользователю разрешено только записывать ТО и работать с заданиями на смену.", "error")
+                    flash("Этому пользователю разрешено только записывать ТО, работать с заданиями на смену и журналом смены.", "error")
                     return redirect(request.referrer or url_for("index"))
         return None
 
