@@ -6,6 +6,13 @@ from flask import flash, redirect, render_template, request, url_for
 from ..db import fetch_all, fetch_one, get_db, get_setting, log_operation, ref_id
 from ..utils import maintenance_next_due, to_int, to_iso_date
 
+MAINTENANCE_STATUS_LABELS = {
+    "overdue": "Просрочено",
+    "due_soon": "Скоро ТО",
+    "ok": "Норма",
+    "no_data": "Не проводилось",
+}
+
 
 def register(app):
     @app.route("/maintenance")
@@ -20,18 +27,28 @@ def register(app):
         except (TypeError, ValueError):
             page = 1
         type_id = to_int(request.args.get("type"))
-        status_filter = request.args.get("status", "").strip() or None  # overdue, due_soon, ok, no_data
+        status_filter = (request.args.get("status") or "").strip() or None
+        if status_filter not in MAINTENANCE_STATUS_LABELS:
+            status_filter = None
+        filter_q = (request.args.get("q") or "").strip()[:100]
         machine_types = [dict(r) for r in fetch_all("SELECT id, name FROM machine_types ORDER BY name")]
-        # CTE: машины с датами ТО и вычисленным to_status в SQL
+        # Последняя запись ТО по каждой машине берётся одним проходом (а не тремя
+        # подзапросами на каждую строку), статус и «дней до ТО» считаются в SQL.
         cte = """
-        WITH to_data AS (
+        WITH last_mnt AS (
+            SELECT mnt.machine_id, mnt.next_due_at, mnt.performed_at, mnt.performed_by
+            FROM machine_maintenance mnt
+            JOIN (SELECT machine_id, MAX(id) AS id FROM machine_maintenance GROUP BY machine_id) lm
+              ON lm.id = mnt.id
+        ),
+        to_data AS (
             SELECT m.id, m.inventory_number, mm.name AS model_name, mt.id AS type_id, mt.name AS type_name,
-                   (SELECT next_due_at FROM machine_maintenance mnt WHERE mnt.machine_id = m.id ORDER BY mnt.id DESC LIMIT 1) AS next_due_at,
-                   (SELECT performed_at FROM machine_maintenance mnt WHERE mnt.machine_id = m.id ORDER BY mnt.id DESC LIMIT 1) AS last_performed_at,
-                   (SELECT performed_by FROM machine_maintenance mnt WHERE mnt.machine_id = m.id ORDER BY mnt.id DESC LIMIT 1) AS last_performed_by
+                   l.next_due_at, l.performed_at AS last_performed_at, l.performed_by AS last_performed_by,
+                   CAST(julianday(substr(l.next_due_at, 1, 10)) - julianday(date('now', 'localtime')) AS INTEGER) AS days_left
             FROM machines m
             JOIN machine_models mm ON m.machine_model_id = mm.id
             JOIN machine_types mt ON mm.machine_type_id = mt.id
+            LEFT JOIN last_mnt l ON l.machine_id = m.id
         ),
         with_status AS (
             SELECT *, CASE
@@ -43,88 +60,53 @@ def register(app):
             FROM to_data
         )
         """
-        where, params = [], ()
+        # Фильтры без статуса: по ним считаются плитки-счётчики
+        base_where, base_params = [], []
         if type_id is not None:
-            where.append("type_id = ?")
-            params = (*params, type_id)
+            base_where.append("type_id = ?")
+            base_params.append(type_id)
+        if filter_q:
+            like = f"%{filter_q.casefold()}%"
+            base_where.append("(CASEFOLD(inventory_number) LIKE ? OR CASEFOLD(model_name) LIKE ?)")
+            base_params.extend([like, like])
+        base_sql = "".join(" AND " + w for w in base_where)
+        status_counts = {k: 0 for k in MAINTENANCE_STATUS_LABELS}
+        for r in fetch_all(
+            f"{cte} SELECT to_status, COUNT(*) AS c FROM with_status WHERE 1=1{base_sql} GROUP BY to_status",
+            tuple(base_params),
+        ):
+            status_counts[r["to_status"]] = r["c"]
+        total_all = sum(status_counts.values())
+
+        where_sql, params = base_sql, list(base_params)
         if status_filter:
-            where.append("to_status = ?")
-            params = (*params, status_filter)
-        where_sql = (" AND " + " AND ".join(where)) if where else ""
-        count_sql = f"""
-            WITH to_data AS (
-                SELECT m.id, mt.id AS type_id,
-                    (SELECT next_due_at FROM machine_maintenance mnt WHERE mnt.machine_id = m.id ORDER BY mnt.id DESC LIMIT 1) AS next_due_at
-                FROM machines m
-                JOIN machine_models mm ON m.machine_model_id = mm.id
-                JOIN machine_types mt ON mm.machine_type_id = mt.id
-            ),
-            with_status AS (
-                SELECT *, CASE
-                    WHEN next_due_at IS NULL THEN 'no_data'
-                    WHEN next_due_at < date('now', 'localtime') THEN 'overdue'
-                    WHEN next_due_at <= date('now', 'localtime', '+14 days') THEN 'due_soon'
-                    ELSE 'ok'
-                END AS to_status
-                FROM to_data
-            )
-            SELECT COUNT(*) AS c FROM with_status WHERE 1=1{where_sql}
-        """
-        total = fetch_one(count_sql, params)["c"]
+            where_sql += " AND to_status = ?"
+            params.append(status_filter)
+        total = status_counts[status_filter] if status_filter else total_all
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = min(page, total_pages)
         offset = (page - 1) * per_page
         order_sql = "ORDER BY CASE WHEN next_due_at IS NULL THEN 1 ELSE 0 END, next_due_at ASC, inventory_number LIMIT ? OFFSET ?"
-        list_sql = f"""
-            {cte}
-            SELECT * FROM with_status WHERE 1=1{where_sql} {order_sql}
-        """
-        machines = fetch_all(list_sql, (*params, per_page, offset))
-        machines = [dict(r) for r in machines]
-        for m in machines:
-            m["to_status_label"] = {"overdue": "Просрочено", "due_soon": "Скоро ТО", "ok": "Норма", "no_data": "ТО не проводилось"}.get(m.get("to_status"), "—")
-        # Данные для графика: ТО по месяцам (последние 12 месяцев)
-        maintenance_by_month = fetch_all(
-            """
-            SELECT strftime('%Y-%m', performed_at) AS month, COUNT(*) AS cnt
-            FROM machine_maintenance
-            WHERE performed_at >= date('now', 'localtime', '-12 months')
-            GROUP BY strftime('%Y-%m', performed_at)
-            ORDER BY month
-            """
-        )
-        maintenance_by_month = [dict(r) for r in maintenance_by_month]
-        # Заполняем все месяцы за последний год (чтобы на графике не было пропусков)
-        months_ago = []
-        for i in range(11, -1, -1):
-            d = date.today()
-            month = d.month - i
-            year = d.year
-            while month < 1:
-                month += 12
-                year -= 1
-            months_ago.append(f"{year}-{month:02d}")
-        month_counts = {r["month"]: r["cnt"] for r in maintenance_by_month}
-        chart_labels = []
-        chart_data = []
-        for m in months_ago:
-            year, month = m.split("-")
-            month_names = (
-                "янв", "фев", "мар", "апр", "май", "июн",
-                "июл", "авг", "сен", "окт", "ноя", "дек",
+        machines = [
+            dict(r)
+            for r in fetch_all(
+                f"{cte} SELECT * FROM with_status WHERE 1=1{where_sql} {order_sql}",
+                (*params, per_page, offset),
             )
-            chart_labels.append(f"{month_names[int(month) - 1]} {year}")
-            chart_data.append(month_counts.get(m, 0))
+        ]
+        for m in machines:
+            m["to_status_label"] = MAINTENANCE_STATUS_LABELS.get(m.get("to_status"), "—")
         return render_template(
             "maintenance_list.html",
             machines=machines,
             machine_types=machine_types,
             today=today,
-            chart_labels=chart_labels,
-            chart_data=chart_data,
             pagination={"page": page, "per_page": per_page, "total": total, "total_pages": total_pages},
             filter_type=type_id,
             filter_status=status_filter or "",
+            filter_q=filter_q,
+            status_counts=status_counts,
+            total_all=total_all,
             maintenance_interval_months=get_setting("maintenance_interval_months", "3"),
         )
 
