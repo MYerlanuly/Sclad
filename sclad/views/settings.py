@@ -25,7 +25,7 @@ def register(app):
                 pass
             backup_dir = (request.form.get("backup_dir") or "").strip()
             if backup_dir and not _is_allowed_backup_path(backup_dir):
-                flash("Директория для копий должна быть внутри папки «backups» приложения.", "error")
+                flash(f"Директория для копий должна быть внутри папки {BACKUP_ROOT}", "error")
                 backup_dir = get_setting("backup_dir", "")
             set_setting("backup_dir", backup_dir)
             backup_schedule = (request.form.get("backup_schedule") or "off").strip()

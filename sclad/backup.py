@@ -6,7 +6,7 @@ import tempfile
 import time
 from datetime import datetime
 
-from .config import BACKUP_LOCK_PATH, BACKUP_ROOT, DATABASE, LOCK_STALE_SEC
+from .config import BACKUP_FILE_PREFIX, BACKUP_LOCK_PATH, BACKUP_ROOT, DATABASE, LOCK_STALE_SEC
 from .db import set_setting
 
 
@@ -81,7 +81,7 @@ def do_backup_to_dir(backup_dir):
         fd, tmp_path = tempfile.mkstemp(suffix=".db")
         os.close(fd)
         snapshot_database(tmp_path)
-        filename = f"inventory_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"
+        filename = f"{BACKUP_FILE_PREFIX}_backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.db"
         dest_path = os.path.join(real_backup_dir, filename)
         shutil.copy2(tmp_path, dest_path)
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M")

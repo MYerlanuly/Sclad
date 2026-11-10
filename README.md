@@ -34,6 +34,19 @@ python app.py
 | `FLASK_SECRET_KEY` | Секрет для подписи сессий. Обязательно длинный случайный: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `FLASK_DEBUG` | `1` только для разработки, в продакшене `0` |
 | `SCLAD_DATABASE` | Необязательно: путь к файлу базы (по умолчанию `inventory.db` в папке проекта) |
+| `SCLAD_INSTANCE`, `SCLAD_NAME`, `SCLAD_PORT`, `SCLAD_BACKUP_DIR` | Для склада другого отдела, см. ниже |
+
+## Склад для другого отдела
+
+Второй склад со своей базой, пользователями и копиями запускается из той же папки
+с отдельным файлом настроек:
+
+```bat
+copy .env.otdel.example .env.otdel2
+python app.py --env .env.otdel2
+```
+
+Подробно, включая сервер: [docs/MULTIPLE_WAREHOUSES.md](docs/MULTIPLE_WAREHOUSES.md).
 
 ## Роли пользователей
 
@@ -116,3 +129,4 @@ python tests/load_test.py --users 20 --seconds 30
 - [docs/DEPLOY_LINUX.md](docs/DEPLOY_LINUX.md): Linux, venv, gunicorn, systemd
 - [docs/DEPLOY_DEBIAN_NGINX.md](docs/DEPLOY_DEBIAN_NGINX.md): Debian с nginx
 - [docs/DEPLOY_OFFLINE.md](docs/DEPLOY_OFFLINE.md): установка на сервер без интернета
+- [docs/MULTIPLE_WAREHOUSES.md](docs/MULTIPLE_WAREHOUSES.md): несколько складов для разных отделов
