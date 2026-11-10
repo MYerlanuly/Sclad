@@ -1,0 +1,7 @@
+{# Вкладки раздела «Техобслуживание»: active = 'list' | 'history' #}
+<div class="flex gap-1 border-b border-slate-200 mb-4 text-sm" id="maintenance-tabs">
+    {% for key, endpoint, label in [('list', 'maintenance_list', 'Техника'), ('history', 'maintenance_history', 'История ТО')] %}
+    <a href="{{ url_for(endpoint) }}" style="text-decoration: none;"
+       class="px-4 py-2 -mb-px border-b-2 {% if active_tab == key %}border-primary-600 text-primary-700 font-semibold{% else %}border-transparent text-slate-600 hover:text-slate-900{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>

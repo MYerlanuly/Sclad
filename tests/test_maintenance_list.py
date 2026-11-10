@@ -45,3 +45,37 @@ def test_maintenance_list_tiles_filters_and_days_left(admin, seed):
     # Неизвестный статус игнорируется
     html = admin.get("/maintenance?status=bogus").get_data(as_text=True)
     assert len(_rows(html)) == 3
+
+
+def test_maintenance_history_filters(client_for, seed):
+    m3 = db_exec("INSERT INTO machines (inventory_number, machine_model_id) VALUES ('ЭКГ-777', ?)", (seed["model"],))
+    for mid, performed, who, remarks in (
+        (seed["machine"], "2026-01-15", "Иванов Пётр", None),
+        (seed["machine"], "2026-04-15", "Петров Иван, Иванов Пётр", "Заменён датчик"),
+        (m3, "2026-03-01", "Петров Иван", None),
+    ):
+        db_exec(
+            "INSERT INTO machine_maintenance (machine_id, performed_at, next_due_at, performed_by, remarks) "
+            "VALUES (?, ?, date(?, '+3 months'), ?, ?)",
+            (mid, performed, performed, who, remarks),
+        )
+    c = client_for("reader")
+
+    html = c.get("/maintenance/history").get_data(as_text=True)
+    assert "Найдено ТО: 3" in html
+    # Сначала самые свежие
+    assert html.index("15.04.26") < html.index("01.03.26") < html.index("15.01.26")
+    assert html.count('/act"') == 3
+
+    html = c.get("/maintenance/history?date_from=2026-02-01&date_to=2026-03-31").get_data(as_text=True)
+    assert "Найдено ТО: 1" in html and "ЭКГ-777" in html
+
+    html = c.get("/maintenance/history?engineer=иванов пётр").get_data(as_text=True)
+    assert "Найдено ТО: 2" in html
+
+    html = c.get("/maintenance/history?q=датчик").get_data(as_text=True)
+    assert "Найдено ТО: 1" in html
+
+    # Даты перепутаны местами — меняются, а не дают пустой список
+    html = c.get("/maintenance/history?date_from=2026-12-31&date_to=2026-01-01").get_data(as_text=True)
+    assert "Найдено ТО: 3" in html
