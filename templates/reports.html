@@ -1,261 +1,603 @@
 {% extends "base.html" %}
-{% block title %}Отчёты и аналитика{% endblock %}
+{% block title %}Аналитический отчёт{% endblock %}
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (none, 'Отчёты и аналитика')]) }}{% endblock %}
 {% block content %}
-<div class="card mb-8">
-    <div class="card-header">
-        <div class="card-title">Сводка по складу</div>
-    </div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Оборудование</p>
-            <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ warehouse_summary.equipment_total }}</p>
-            <p class="text-xs text-slate-500 mt-2">на складе {{ warehouse_summary.equipment_warehouse }} · установлено {{ warehouse_summary.equipment_installed }}{% if warehouse_summary.equipment_other %} · прочее {{ warehouse_summary.equipment_other }}{% endif %}</p>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Техника</p>
-            <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ warehouse_summary.machines_total }}</p>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">SIM-карты</p>
-            <p class="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{{ warehouse_summary.sim_total }}</p>
-            <p class="text-xs text-slate-500 mt-2">на складе {{ warehouse_summary.sim_warehouse }}</p>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p class="text-sm font-medium text-slate-500 uppercase tracking-wide">Оборудование по видам</p>
-            <ul class="text-sm text-slate-600 mt-2 space-y-0.5">
-                {% for r in equipment_by_kind %}
-                <li>{{ 'Датчики' if r.equipment_kind == 'sensor' else 'Прочее' }}: {{ r.cnt }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    {% if machines_by_type %}
-    <div>
-        <h3 class="text-sm font-semibold text-slate-700 mb-2">Техника по типам</h3>
-        <div class="flex flex-wrap gap-3">
-            {% for r in machines_by_type %}
-            <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700">{{ r.type_name }}: {{ r.cnt }}</span>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-</div>
+{% macro icon(name, cls='w-4 h-4') %}
+<svg class="{{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{% if name == 'alert' %}<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+{% elif name == 'info' %}<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>
+{% elif name == 'warn' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5h.01"/>
+{% elif name == 'check' %}<path d="m5 12 5 5L20 7"/>
+{% elif name == 'print' %}<path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v7H7z"/>
+{% elif name == 'download' %}<path d="M12 4v12M6 10l6 6 6-6M4 20h16"/>
+{% elif name == 'arrow' %}<path d="M5 12h14M13 6l6 6-6 6"/>
+{% elif name == 'up' %}<path d="m6 15 6-6 6 6"/>
+{% elif name == 'down' %}<path d="m6 9 6 6 6-6"/>
+{% endif %}
+</svg>
+{% endmacro %}
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">Оборудование по статусам</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-4 flex justify-center items-center" style="min-height: 260px;">
-            {% if eq_chart_labels %}
-            <canvas id="chart-equipment" width="280" height="260"></canvas>
-            {% else %}
-            <p class="text-slate-500 text-sm">Нет данных</p>
-            {% endif %}
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">ТО по месяцам (последние 12 мес.)</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-4" style="min-height: 260px;">
-            <canvas id="chart-maintenance" height="240"></canvas>
-        </div>
-    </div>
-</div>
+{% macro delta(d, good_up=true) %}
+{% if d.dir == 'flat' %}<span class="dl dl-flat">без изменений</span>
+{% else %}{% set good = (d.dir == 'up') == good_up %}
+<span class="dl {{ 'dl-neutral' if good_up is none else ('dl-good' if good else 'dl-bad') }}" title="Прошлый период: {{ d.prev }}">{{ icon('up' if d.dir == 'up' else 'down', 'w-3 h-3') }}{{ '+' if d.diff > 0 else '−' }}{{ d.diff|abs }}{% if d.pct is not none %} · {{ d.pct|abs }}%{% endif %}</span>
+{% endif %}
+{% endmacro %}
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">Задания на смену по статусам (30 дней)</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-4 flex justify-center items-center" style="min-height: 260px;">
-            {% if tasks_status_labels %}
-            <canvas id="chart-tasks-status" width="280" height="260"></canvas>
-            {% else %}
-            <p class="text-slate-500 text-sm">Нет данных</p>
-            {% endif %}
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">Задания на смену по типам (30 дней)</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-4" style="min-height: 260px;">
-            {% if tasks_type_labels %}
-            <canvas id="chart-tasks-type" height="240"></canvas>
-            {% else %}
-            <p class="text-slate-500 text-sm">Нет данных</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
+{% set links = {
+    'maintenance_overdue': url_for('maintenance_list', status='overdue'),
+    'maintenance_no_data': url_for('maintenance_list', status='no_data'),
+    'tasks_not_done': url_for('shift_tasks_list', status='not_done', date_from=r.date_from, date_to=r.date_to),
+    'tasks_pending': url_for('shift_tasks_list', status='pending', date_from='', date_to=r.yesterday),
+    'equipment_faulty': url_for('equipment_list', status=4),
+    'machines': url_for('machines_list'),
+    'maintenance_history': url_for('maintenance_history', date_from=r.tomorrow),
+} %}
+{% set period_names = {7: '7 дней', 30: '30 дней', 90: '90 дней', 365: 'Год'} %}
+{% set ms = r.maintenance.status %}
+{% set mt = r.machines.total %}
 
-<div class="card mb-8">
-    <div class="card-header">
-        <div class="card-title">Задания по пользователям (последние 30 дней)</div>
+<style>
+    .rep { --line: #e5e7eb; --line-soft: #f1f5f9; --ink: #0f172a; --ink-2: #334155; --muted: #64748b; --faint: #94a3b8;
+           --blue: #2563eb; --blue-soft: #dbeafe; --teal: #0d9488; --green: #16a34a; --amber: #d97706; --red: #dc2626; --slate: #94a3b8; --none: #e2e8f0;
+           --r: 12px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+    .rep a { text-decoration: none; }
+    .tnum { font-variant-numeric: tabular-nums; }
+
+    /* Обложка */
+    .cover { position: relative; overflow: hidden; border-radius: 16px; padding: 32px 32px 28px; color: #e2e8f0;
+             background: radial-gradient(120% 140% at 100% 0%, #1e3a8a 0%, #0f172a 55%, #0b1120 100%); }
+    .cover::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+                    background-image: linear-gradient(rgb(255 255 255 / .04) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / .04) 1px, transparent 1px);
+                    background-size: 32px 32px; mask-image: linear-gradient(90deg, transparent, #000 70%); }
+    .cover > * { position: relative; z-index: 1; }
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #93c5fd; }
+    .cover h1 { margin: 8px 0 6px; font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+    .cover-sub { font-size: 15px; color: #cbd5e1; max-width: 640px; }
+    .cover-meta { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 22px; font-size: 13px; }
+    .cover-meta dt { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .cover-meta dd { margin: 2px 0 0; color: #f8fafc; font-weight: 500; }
+    .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: rgb(255 255 255 / .08); border: 1px solid rgb(255 255 255 / .12); }
+    .seg a { padding: 5px 12px; border-radius: 7px; font-size: 13px; color: #cbd5e1; }
+    .seg a:hover { color: #fff; background: rgb(255 255 255 / .08); }
+    .seg a.on { background: #fff; color: var(--ink); font-weight: 600; }
+    .ghost { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; font-size: 13px; font-weight: 500;
+             color: #e2e8f0; border: 1px solid rgb(255 255 255 / .18); background: transparent; cursor: pointer; }
+    .ghost:hover { background: rgb(255 255 255 / .08); color: #fff; }
+
+    /* Навигация по разделам */
+    .toc { position: sticky; top: 0; z-index: 20; margin: 0 -4px; padding: 10px 4px; background: rgb(248 250 252 / .92); backdrop-filter: blur(6px);
+           display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
+    .toc a { flex: none; padding: 5px 10px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+    .toc a:hover { color: var(--ink); background: #fff; }
+    .toc a span { color: var(--faint); margin-right: 4px; font-variant-numeric: tabular-nums; }
+
+    /* Разделы */
+    .sec { margin-top: 40px; scroll-margin-top: 64px; }
+    .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .sec-num { font-size: 12px; font-weight: 600; color: var(--blue); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+    .sec h2 { margin: 2px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.015em; color: var(--ink); }
+    .sec-lead { margin: 4px 0 0; color: var(--muted); max-width: 720px; }
+
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 20px; }
+    .panel-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+    .panel-sub { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+    .grid-2 { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    @media (min-width: 1024px) { .grid-2 { grid-template-columns: 1fr 1fr; } .grid-32 { grid-template-columns: 3fr 2fr; } }
+
+    /* Резюме */
+    .finding { display: flex; gap: 14px; padding: 18px 20px; background: #fff; border: 1px solid var(--line); border-radius: var(--r); }
+    .finding-mark { flex: none; width: 4px; border-radius: 4px; background: var(--slate); }
+    .finding-good .finding-mark { background: var(--green); } .finding-warn .finding-mark { background: var(--amber); } .finding-bad .finding-mark { background: var(--red); }
+    .finding h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .finding p { margin: 0; font-size: 15px; color: var(--ink); line-height: 1.5; }
+
+    /* KPI */
+    .kpis { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (min-width: 768px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (min-width: 1200px) { .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+    .kpi { display: flex; flex-direction: column; padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+    .kpi-label { font-size: 12.5px; color: var(--muted); line-height: 1.3; min-height: 2.6em; }
+    .kpi-value { margin-top: 6px; font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .kpi-value small { font-size: 16px; font-weight: 600; color: var(--muted); margin-left: 1px; }
+    .kpi-foot { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .meter { height: 6px; border-radius: 99px; background: var(--line-soft); overflow: hidden; margin-top: 12px; }
+    .meter > span { display: block; height: 100%; border-radius: 99px; background: var(--blue); }
+    .meter-good > span { background: var(--green); } .meter-warn > span { background: var(--amber); } .meter-bad > span { background: var(--red); }
+    .dl { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .dl-good { color: var(--green); } .dl-bad { color: var(--red); } .dl-flat { color: var(--faint); font-weight: 500; } .dl-neutral { color: var(--ink-2); }
+
+    /* Сегментная полоса (доли целого) */
+    .stack { display: flex; height: 14px; gap: 2px; border-radius: 6px; overflow: hidden; background: var(--line-soft); }
+    .stack > span { display: block; height: 100%; min-width: 2px; }
+    .stack-sm { height: 8px; border-radius: 4px; }
+    .t-blue { background: var(--blue); } .t-teal { background: var(--teal); } .t-slate { background: var(--slate); } .t-red { background: var(--red); }
+    .t-dark { background: #475569; } .t-green { background: var(--green); } .t-amber { background: var(--amber); } .t-none { background: var(--none); }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 13px; }
+    .legend li { display: flex; align-items: center; gap: 6px; }
+    .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .legend b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .legend em { font-style: normal; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+    /* Таблицы */
+    .rt { width: 100%; border-collapse: collapse; box-shadow: none; border-radius: 0; background: transparent; }
+    .rt th { background: transparent; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--faint);
+             padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    .rt td { padding: 10px; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; color: var(--ink-2); vertical-align: middle; }
+    .rt tr:last-child td { border-bottom: none; }
+    .rt tr:hover td { background: #f8fafc; }
+    .rt .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rt .strong { color: var(--ink); font-weight: 500; }
+    .rt .zero { color: #cbd5e1; }
+    .rt .red { color: var(--red); font-weight: 600; }
+    .rate { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+    .rate .meter { flex: 1; margin: 0; }
+    .rate b { width: 38px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .scroll-x { overflow-x: auto; }
+
+    .chart-box { position: relative; height: 260px; margin-top: 16px; }
+    .panel-fill { display: flex; flex-direction: column; } .panel-fill .chart-box { flex: 1; min-height: 260px; height: auto; }
+    .note { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; font-size: 13px; color: var(--muted); }
+    .note b { color: var(--ink-2); }
+
+    /* Проблемы */
+    .issue { display: flex; gap: 14px; align-items: flex-start; padding: 16px 20px; border-top: 1px solid var(--line-soft); }
+    .issue:first-child { border-top: none; }
+    .issue-ico { flex: none; width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; }
+    .lv-critical .issue-ico { background: #fee2e2; color: var(--red); }
+    .lv-warning .issue-ico { background: #fef3c7; color: var(--amber); }
+    .lv-info .issue-ico { background: #e0f2fe; color: #0369a1; }
+    .issue-title { font-weight: 600; color: var(--ink); }
+    .issue-lv { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-left: 8px; }
+    .lv-critical .issue-lv { color: var(--red); } .lv-warning .issue-lv { color: var(--amber); } .lv-info .issue-lv { color: #0369a1; }
+    .issue-text { margin-top: 2px; font-size: 13.5px; color: var(--muted); }
+    .issue-num { margin-left: auto; text-align: right; flex: none; }
+    .issue-num b { display: block; font-size: 22px; line-height: 1; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .issue-num span { font-size: 12px; color: var(--muted); }
+    .issue-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 13px; font-weight: 500; color: var(--blue); }
+    .issue-link:hover { text-decoration: underline; }
+
+    /* План */
+    .step { display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 18px 20px; border-top: 1px solid var(--line-soft); }
+    .step:first-child { border-top: none; }
+    .step-n { width: 32px; height: 32px; border-radius: 99px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center;
+              font-weight: 600; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .pr { display: inline-flex; padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; letter-spacing: .03em; margin-left: 8px; vertical-align: 2px; }
+    .pr-high { background: #fee2e2; color: #b91c1c; } .pr-medium { background: #fef3c7; color: #92400e; } .pr-low { background: #f1f5f9; color: #475569; }
+    .step-metric { margin-top: 8px; font-size: 12.5px; color: var(--ink-2); font-weight: 500; }
+
+    .field-s { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+    .field-s select, .field-s input { height: 36px; padding: 0 10px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); }
+    .btn-p { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500;
+             background: var(--blue); color: #fff !important; border: none; cursor: pointer; }
+    .btn-p:hover { background: #1d4ed8; }
+    .btn-s { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 14px; font-weight: 500;
+             background: #fff; color: var(--ink-2) !important; border: 1px solid var(--line); }
+    .btn-s:hover { background: #f8fafc; }
+    .empty { padding: 28px; text-align: center; color: var(--faint); font-size: 13px; }
+
+    @media (max-width: 640px) {
+        .cover { padding: 24px 20px; } .cover h1 { font-size: 24px; }
+        .panel { padding: 16px; } .issue, .step { padding: 14px 16px; }
+        .kpi-value { font-size: 26px; }
+    }
+    @media print {
+        @page { size: A4; margin: 12mm; }
+        .toc, .no-print { display: none !important; }
+        .rep { font-size: 12px; }
+        .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { background: #fff !important; }
+        .sec { margin-top: 24px; }
+        .sec-head { break-after: avoid; }
+        .panel, .finding, .kpi, .issue, .step { break-inside: avoid; }
+        .stack, .meter, .legend i, .finding-mark, .issue-ico, .pr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .card:hover, .panel:hover { transform: none; }
+    }
+</style>
+
+<div class="rep">
+
+{# ============ Обложка ============ #}
+<header class="cover">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+            <div class="eyebrow">Аналитический отчёт · {{ sclad_name }}</div>
+            <h1>Склад, техника и работа смен</h1>
+            <p class="cover-sub">Состояние оборудования и парка, исполнение техобслуживания и заданий на смену. Все цифры взяты из базы на момент формирования отчёта.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 no-print">
+            <button type="button" class="ghost" onclick="window.print()">{{ icon('print') }}Печать / PDF</button>
+            <a class="ghost" href="{{ url_for('export_inventory_excel') }}">{{ icon('download') }}Excel</a>
+        </div>
     </div>
-    <p class="text-slate-600 text-sm mb-4">Кто сколько создал заданий, выполнил (отметил себя исполнителем) и отметил как не выполненные.</p>
-    {% if tasks_by_user %}
-    <div class="table-wrap">
-    <table>
-        <thead>
-            <tr>
-                <th>Пользователь</th>
-                <th class="text-right">Создал заданий</th>
-                <th class="text-right">Выполнил</th>
-                <th class="text-right">Отметил не выполнено</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in tasks_by_user %}
-            <tr>
-                <td>{{ r.user_name }}</td>
-                <td class="text-right tabular-nums">{{ r.created }}</td>
-                <td class="text-right tabular-nums">{{ r.completed }}</td>
-                <td class="text-right tabular-nums">{{ r.not_done }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <dl class="cover-meta">
+            <div><dt>Период</dt><dd class="tnum">{{ r.date_from|datefmt }} — {{ r.date_to|datefmt }}</dd></div>
+            <div><dt>Сравнение</dt><dd class="tnum">с {{ r.prev_from|datefmt }} — {{ r.prev_to|datefmt }}</dd></div>
+            <div><dt>Сформирован</dt><dd class="tnum">{{ generated_at.strftime('%d.%m.%Y %H:%M') }}</dd></div>
+        </dl>
+        <nav class="seg no-print" aria-label="Период отчёта">
+            {% for p in r.periods %}<a href="{{ url_for('reports', days=p) }}" class="{{ 'on' if p == r.days }}">{{ period_names[p] }}</a>{% endfor %}
+        </nav>
+    </div>
+</header>
+
+<nav class="toc no-print" aria-label="Разделы отчёта">
+    <a href="#summary"><span>01</span>Резюме</a>
+    <a href="#kpi"><span>02</span>Показатели</a>
+    <a href="#maintenance"><span>03</span>Техобслуживание</a>
+    <a href="#tasks"><span>04</span>Задания на смену</a>
+    <a href="#equipment"><span>05</span>Оборудование</a>
+    <a href="#issues"><span>06</span>Проблемы</a>
+    <a href="#plan"><span>07</span>План действий</a>
+    <a href="#export"><span>08</span>Выгрузка</a>
+</nav>
+
+{# ============ 01. Резюме ============ #}
+<section class="sec" id="summary">
+    <div class="sec-head"><div><div class="sec-num">01</div><h2>Краткое резюме</h2>
+        <p class="sec-lead">Главное за {{ period_names[r.days]|lower if r.days != 365 else 'год' }}: что идёт по плану, а что требует решения.</p></div></div>
+    {% if r.findings %}
+    <div class="grid-2">
+        {% for f in r.findings %}
+        <article class="finding finding-{{ f.tone }}"><span class="finding-mark"></span><div><h3>{{ f.title }}</h3><p>{{ f.text }}</p></div></article>
+        {% endfor %}
     </div>
     {% else %}
-    <p class="text-slate-500 text-sm mb-0">Нет данных за период.</p>
+    <div class="panel empty">В базе пока нет данных для выводов: добавьте технику, оборудование или задания на смену.</div>
     {% endif %}
-</div>
+</section>
 
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">Выгрузка отчёта за период</div>
+{# ============ 02. Ключевые показатели ============ #}
+{% set tr = r.tasks.rate %}
+{% set cov = r.maintenance.on_schedule_pct %}
+<section class="sec" id="kpi">
+    <div class="sec-head"><div><div class="sec-num">02</div><h2>Ключевые показатели</h2>
+        <p class="sec-lead">Доли считаются от текущего состояния базы, потоки — за выбранный период и сравниваются с предыдущим периодом той же длины.</p></div></div>
+    <div class="kpis">
+        <div class="kpi">
+            <span class="kpi-label">Техника в графике ТО</span>
+            <span class="kpi-value">{{ cov }}<small>%</small></span>
+            <div class="meter {{ 'meter-good' if cov >= 90 else ('meter-warn' if cov >= 60 else 'meter-bad') }}"><span style="width: {{ cov }}%"></span></div>
+            <span class="kpi-foot tnum">{{ r.maintenance.on_schedule }} из {{ mt }} · просрочено {{ ms.overdue }}</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">Выполнение заданий на смену</span>
+            {% if tr is not none %}
+            <span class="kpi-value">{{ tr }}<small>%</small></span>
+            <div class="meter {{ 'meter-good' if tr >= 80 else ('meter-warn' if tr >= 60 else 'meter-bad') }}"><span style="width: {{ tr }}%"></span></div>
+            <span class="kpi-foot tnum">{{ r.tasks.done }} из {{ r.tasks.closed }} закрытых{% if r.tasks_prev.rate is not none %} · было {{ r.tasks_prev.rate }}%{% endif %}</span>
+            {% else %}<span class="kpi-value zero">—</span><span class="kpi-foot">нет закрытых заданий за период</span>{% endif %}
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">Проведено ТО за период</span>
+            <span class="kpi-value">{{ r.maintenance.period }}</span>
+            <span class="kpi-foot">{{ delta(r.maintenance.delta) }}</span>
+            <span class="kpi-foot tnum" style="margin-top: 4px">исполнителей: {{ r.maintenance.engineers }}</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">Оборудование установлено</span>
+            <span class="kpi-value">{{ r.equipment.installed_pct }}<small>%</small></span>
+            <div class="meter"><span style="width: {{ r.equipment.installed_pct }}%"></span></div>
+            <span class="kpi-foot tnum">{{ r.equipment.installed }} из {{ r.equipment.active }} · склад {{ r.equipment.warehouse }}</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">SIM-карты установлены</span>
+            <span class="kpi-value">{{ r.sim.installed_pct }}<small>%</small></span>
+            <div class="meter"><span style="width: {{ r.sim.installed_pct }}%"></span></div>
+            <span class="kpi-foot tnum">{{ r.sim.installed }} из {{ r.sim.total }} · склад {{ r.sim.warehouse }}</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">Операций в журнале за период</span>
+            <span class="kpi-value">{{ r.ops.period }}</span>
+            <span class="kpi-foot">{{ delta(r.ops.delta, none) }}</span>
+            <span class="kpi-foot tnum" style="margin-top: 4px">установок {{ r.ops.install }} · демонтажей {{ r.ops.remove }}</span>
+        </div>
     </div>
-    <p class="text-slate-600 text-sm mb-4">Выберите тип отчёта и период (для «Операции» и «ТО» период учитывается; для «Список техники» и «Список оборудования» выгружается полный список на текущую дату). CSV в кодировке UTF-8.</p>
-    <form method="get" action="{{ url_for('reports_export') }}" class="flex flex-wrap items-end gap-4">
-        <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium text-slate-700">Тип отчёта</span>
-            <select name="type" class="px-3 py-2 text-sm border border-slate-300 rounded-lg w-48">
-                <option value="operations">Операции за период</option>
-                <option value="maintenance">ТО за период</option>
-                <option value="machines">Список техники (на дату)</option>
-                <option value="equipment">Список оборудования (на дату)</option>
-            </select>
-        </label>
-        <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium text-slate-700">Дата с</span>
-            <input type="date" name="from" value="{{ date_from_default }}" class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
-        </label>
-        <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium text-slate-700">Дата по</span>
-            <input type="date" name="to" value="{{ date_to_default }}" class="px-3 py-2 text-sm border border-slate-300 rounded-lg">
-        </label>
-        <button type="submit" class="btn btn-primary">Скачать CSV</button>
-    </form>
+</section>
+
+{# ============ 03. Техобслуживание ============ #}
+<section class="sec" id="maintenance">
+    <div class="sec-head"><div><div class="sec-num">03</div><h2>Техобслуживание</h2>
+        <p class="sec-lead">Статус по последней записи ТО каждой единицы техники. «Скоро» — до срока 14 дней или меньше.</p></div>
+        <a class="btn-s no-print" href="{{ url_for('maintenance_list') }}">Открыть ТО {{ icon('arrow') }}</a></div>
+    <div class="panel">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 class="panel-title">Парк по статусу ТО</h3>
+            <span class="panel-sub tnum">{{ mt }} ед. техники</span>
+        </div>
+        {% set segs = [('ok', 'В норме', 't-green'), ('due_soon', 'Скоро ТО', 't-amber'), ('overdue', 'Просрочено', 't-red'), ('no_data', 'Нет данных о ТО', 't-none')] %}
+        <div class="stack mt-4" role="img" aria-label="Распределение техники по статусу ТО">
+            {% for key, label, cls in segs %}{% if ms[key] %}<span class="{{ cls }}" style="width: {{ 100 * ms[key] / mt }}%" title="{{ label }}: {{ ms[key] }}"></span>{% endif %}{% endfor %}
+        </div>
+        <ul class="legend">
+            {% for key, label, cls in segs %}<li><i class="{{ cls }}"></i>{{ label }} <b>{{ ms[key] }}</b><em>{{ (100 * ms[key] / mt)|round|int if mt else 0 }}%</em></li>{% endfor %}
+        </ul>
+        {% if mt and ms.no_data * 100 / mt >= 20 %}
+        <p class="note"><b>Что это значит.</b> У {{ ms.no_data }} ед. техники нет ни одной записи о ТО, поэтому система не может посчитать для них срок и не покажет их в просрочках. Реальная доля просроченного ТО может быть выше {{ (100 * ms.overdue / mt)|round|int }}%.</p>
+        {% endif %}
+    </div>
+    <div class="grid-2 grid-32 mt-4">
+        <div class="panel panel-fill">
+            <h3 class="panel-title">Проведено ТО по месяцам</h3>
+            <p class="panel-sub">Последние 12 месяцев · всего {{ r.maintenance.last12 }}{% if r.maintenance.month_avg %}, в среднем {{ r.maintenance.month_avg }} в активный месяц{% endif %}</p>
+            <div class="chart-box"><canvas id="ch-mnt" aria-label="ТО по месяцам"></canvas></div>
+        </div>
+        <div class="panel">
+            <h3 class="panel-title">По типам техники</h3>
+            <p class="panel-sub">Доля в графике = норма + скоро ТО</p>
+            {% if r.maintenance.by_type %}
+            <div class="scroll-x mt-2">
+            <table class="rt">
+                <thead><tr><th>Тип</th><th class="num">Ед.</th><th class="num">Просроч.</th><th class="num">Нет данных</th><th>В графике</th></tr></thead>
+                <tbody>
+                {% for t in r.maintenance.by_type %}
+                <tr>
+                    <td class="strong"><a href="{{ url_for('maintenance_list', type=t.type_id) }}" style="color: inherit">{{ t.type_name }}</a></td>
+                    <td class="num">{{ t.total }}</td>
+                    <td class="num {{ 'red' if t.overdue else 'zero' }}">{{ t.overdue }}</td>
+                    <td class="num {{ '' if t.no_data else 'zero' }}">{{ t.no_data }}</td>
+                    <td><div class="rate"><div class="meter {{ 'meter-good' if t.coverage >= 90 else ('meter-warn' if t.coverage >= 60 else 'meter-bad') }}"><span style="width: {{ t.coverage }}%"></span></div><b>{{ t.coverage }}%</b></div></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="empty">Нет техники</div>{% endif %}
+        </div>
+    </div>
+</section>
+
+{# ============ 04. Задания на смену ============ #}
+<section class="sec" id="tasks">
+    <div class="sec-head"><div><div class="sec-num">04</div><h2>Задания на смену</h2>
+        <p class="sec-lead">Доля выполнения = выполнено ÷ (выполнено + не выполнено). Ожидающие задания в расчёт не входят.</p></div>
+        <a class="btn-s no-print" href="{{ url_for('shift_tasks_list', date_from=r.date_from, date_to=r.date_to) }}">Задания за период {{ icon('arrow') }}</a></div>
+    <div class="panel">
+        <h3 class="panel-title">Исполнение по месяцам</h3>
+        <p class="panel-sub">Последние 12 месяцев, по дате задания</p>
+        <ul class="legend"><li><i class="t-green"></i>Выполнено</li><li><i class="t-red"></i>Не выполнено</li><li><i class="t-none"></i>Ожидает</li></ul>
+        <div class="chart-box" style="height: 280px"><canvas id="ch-tasks" aria-label="Задания по месяцам"></canvas></div>
+    </div>
+    <div class="grid-2 mt-4">
+        <div class="panel">
+            <h3 class="panel-title">Почему задания не выполняются</h3>
+            <p class="panel-sub">{{ r.reasons_total }} {{ 'отметка' if r.reasons_total % 10 == 1 and r.reasons_total % 100 != 11 else 'отметок' }} «не выполнено» за период, сгруппированы по ключевым словам</p>
+            {% if r.reasons %}
+            <ul class="mt-4" style="list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 12px;">
+                {% for x in r.reasons %}
+                <li>
+                    <div class="flex justify-between gap-3 text-sm"><span class="{{ 'text-slate-900 font-medium' if loop.first else '' }}">{{ x.name }}</span><span class="tnum text-slate-500"><b class="text-slate-900">{{ x.cnt }}</b> · {{ x.pct }}%</span></div>
+                    <div class="meter" style="margin-top: 6px"><span style="width: {{ x.pct }}%; background: {{ '#dc2626' if loop.first else '#94a3b8' }}"></span></div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<div class="empty">За период нет невыполненных заданий</div>{% endif %}
+        </div>
+        <div class="panel">
+            <h3 class="panel-title">По типам заданий</h3>
+            <p class="panel-sub">За выбранный период</p>
+            {% if r.tasks_by_type %}
+            <div class="scroll-x mt-2">
+            <table class="rt">
+                <thead><tr><th>Тип</th><th class="num">Всего</th><th class="num">Вып.</th><th class="num">Не вып.</th><th>Выполнение</th></tr></thead>
+                <tbody>
+                {% for t in r.tasks_by_type %}
+                <tr>
+                    <td class="strong">{{ t.type_name }}</td>
+                    <td class="num">{{ t.total }}</td>
+                    <td class="num">{{ t.done }}</td>
+                    <td class="num {{ '' if t.not_done else 'zero' }}">{{ t.not_done }}</td>
+                    <td>{% if t.rate is not none %}<div class="rate"><div class="meter {{ 'meter-good' if t.rate >= 80 else ('meter-warn' if t.rate >= 60 else 'meter-bad') }}"><span style="width: {{ t.rate }}%"></span></div><b>{{ t.rate }}%</b></div>{% else %}<span class="zero">—</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="empty">Нет заданий за период</div>{% endif %}
+        </div>
+    </div>
+    <div class="panel mt-4">
+        <h3 class="panel-title">Вклад сотрудников</h3>
+        <p class="panel-sub">Создал — автор задания; выполнил — отмечен исполнителем; «не выполнено» — кто поставил отметку</p>
+        {% if r.tasks_by_user %}
+        <div class="scroll-x mt-2">
+        <table class="rt">
+            <thead><tr><th>Сотрудник</th><th class="num">Создал</th><th class="num">Выполнил</th><th class="num">Отметил «не вып.»</th><th style="min-width: 180px">Закрыто заданий</th></tr></thead>
+            <tbody>
+            {% for u in r.tasks_by_user %}
+            {% set closed = u.completed + u.not_done %}
+            <tr>
+                <td class="strong">{{ u.user_name }}</td>
+                <td class="num {{ '' if u.created else 'zero' }}">{{ u.created }}</td>
+                <td class="num {{ '' if u.completed else 'zero' }}">{{ u.completed }}</td>
+                <td class="num {{ '' if u.not_done else 'zero' }}">{{ u.not_done }}</td>
+                <td>{% if closed and r.max_user %}<div class="stack stack-sm" style="width: {{ (100 * closed / r.max_user)|round(1) }}%" title="Выполнил {{ u.completed }}, не выполнено {{ u.not_done }}">{% if u.completed %}<span class="t-green" style="width: {{ 100 * u.completed / closed }}%"></span>{% endif %}{% if u.not_done %}<span class="t-red" style="width: {{ 100 * u.not_done / closed }}%"></span>{% endif %}</div>{% else %}<span class="zero">—</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}<div class="empty">Нет данных за период</div>{% endif %}
+    </div>
+</section>
+
+{# ============ 05. Оборудование ============ #}
+{% set eq = r.equipment %}
+<section class="sec" id="equipment">
+    <div class="sec-head"><div><div class="sec-num">05</div><h2>Оборудование и склад</h2>
+        <p class="sec-lead">{{ eq.total }} ед. оборудования ({{ eq.sensors }} датчиков, {{ eq.other }} прочего), {{ eq.names_total }} наименований; {{ mt }} ед. техники, {{ r.sim.total }} SIM-карт.</p></div>
+        <a class="btn-s no-print" href="{{ url_for('equipment_list') }}">Открыть оборудование {{ icon('arrow') }}</a></div>
+    <div class="panel">
+        <div class="flex flex-wrap items-baseline justify-between gap-2"><h3 class="panel-title">Оборудование по статусам</h3><span class="panel-sub tnum">{{ eq.total }} ед.</span></div>
+        {% if eq.total %}
+        <div class="stack mt-4" role="img" aria-label="Оборудование по статусам">
+            {% for s in eq.segments %}{% if s.cnt %}<span class="t-{{ s.tone }}" style="width: {{ 100 * s.cnt / eq.total }}%" title="{{ s.name }}: {{ s.cnt }}"></span>{% endif %}{% endfor %}
+        </div>
+        <ul class="legend">
+            {% for s in eq.segments %}<li><i class="t-{{ s.tone }}"></i><a href="{{ url_for('equipment_list', status=s.id) }}" style="color: inherit">{{ s.name }}</a> <b>{{ s.cnt }}</b><em>{{ s.pct }}%</em></li>{% endfor %}
+        </ul>
+        {% else %}<div class="empty">Оборудование ещё не добавлено</div>{% endif %}
+    </div>
+    <div class="grid-2 mt-4">
+        <div class="panel">
+            <h3 class="panel-title">Основные наименования</h3>
+            <p class="panel-sub">Топ-{{ eq.by_name|length }} из {{ eq.names_total }} по количеству</p>
+            <ul class="legend"><li><i class="t-blue"></i>Установлено</li><li><i class="t-teal"></i>На складе</li><li><i class="t-slate"></i>Демонтировано, неисправно, списано</li></ul>
+            {% if eq.by_name %}
+            {% set maxn = eq.by_name[0].total %}
+            <div class="scroll-x mt-2">
+            <table class="rt">
+                <thead><tr><th>Наименование</th><th class="num">Всего</th><th class="num">Склад</th><th style="min-width: 160px">Структура</th></tr></thead>
+                <tbody>
+                {% for n in eq.by_name %}
+                <tr>
+                    <td class="strong"><a href="{{ url_for('equipment_list', q=n.name) }}" style="color: inherit">{{ n.name }}</a></td>
+                    <td class="num">{{ n.total }}</td>
+                    <td class="num {{ '' if n.warehouse else 'zero' }}">{{ n.warehouse }}</td>
+                    <td><div class="stack stack-sm" style="width: {{ (100 * n.total / maxn)|round(1) }}%" title="Установлено {{ n.installed }}, склад {{ n.warehouse }}, прочее {{ n.other }}">{% if n.installed %}<span class="t-blue" style="width: {{ 100 * n.installed / n.total }}%"></span>{% endif %}{% if n.warehouse %}<span class="t-teal" style="width: {{ 100 * n.warehouse / n.total }}%"></span>{% endif %}{% if n.other %}<span class="t-slate" style="width: {{ 100 * n.other / n.total }}%"></span>{% endif %}</div></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}<div class="empty">Нет данных</div>{% endif %}
+        </div>
+        <div class="panel">
+            <h3 class="panel-title">Установки и демонтажи</h3>
+            <p class="panel-sub">Операции из журнала за 12 месяцев</p>
+            <ul class="legend"><li><i class="t-blue"></i>Установка</li><li><i class="t-slate"></i>Демонтаж</li></ul>
+            <div class="chart-box"><canvas id="ch-flow" aria-label="Установки и демонтажи по месяцам"></canvas></div>
+            {% if r.machines.types %}
+            <h3 class="panel-title mt-6" style="font-size: 14px">Парк техники по типам</h3>
+            <div class="flex flex-wrap gap-2 mt-2">
+                {% for t in r.machines.types %}<span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 500">{{ t.type_name }} <b class="tnum" style="margin-left: 6px; color: #0f172a">{{ t.cnt }}</b></span>{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{# ============ 06. Проблемы ============ #}
+<section class="sec" id="issues">
+    <div class="sec-head"><div><div class="sec-num">06</div><h2>Обнаруженные проблемы</h2>
+        <p class="sec-lead">Отклонения в работе и в качестве данных, найденные автоматически. Порядок — от критичных к информационным.</p></div></div>
+    <div class="panel" style="padding: 0">
+        {% for p in r.problems %}
+        <div class="issue lv-{{ p.level }}">
+            <span class="issue-ico">{{ icon('alert' if p.level == 'critical' else ('warn' if p.level == 'warning' else 'info')) }}</span>
+            <div class="min-w-0">
+                <div><span class="issue-title">{{ p.title }}</span><span class="issue-lv">{{ {'critical': 'Критично', 'warning': 'Внимание', 'info': 'К сведению'}[p.level] }}</span></div>
+                <div class="issue-text">{{ p.text }}</div>
+                {% if p.href %}<a class="issue-link no-print" href="{{ links[p.href] }}">Открыть список {{ icon('arrow', 'w-3 h-3') }}</a>{% endif %}
+            </div>
+            <div class="issue-num"><b>{{ p.count }}</b><span>{{ p.unit }}</span></div>
+        </div>
+        {% else %}
+        <div class="issue"><span class="issue-ico" style="background: #dcfce7; color: #16a34a">{{ icon('check') }}</span><div><div class="issue-title">Проблем не найдено</div><div class="issue-text">Просрочек, незакрытых заданий и ошибок в данных нет.</div></div></div>
+        {% endfor %}
+    </div>
+</section>
+
+{# ============ 07. План действий ============ #}
+<section class="sec" id="plan">
+    <div class="sec-head"><div><div class="sec-num">07</div><h2>Рекомендации и план действий</h2>
+        <p class="sec-lead">Что сделать в первую очередь, чтобы закрыть найденные проблемы, и по какой цифре проверить результат.</p></div></div>
+    {% if r.actions %}
+    <div class="panel" style="padding: 0">
+        {% for a in r.actions %}
+        <div class="step">
+            <span class="step-n">{{ loop.index }}</span>
+            <div>
+                <div><span class="issue-title">{{ a.title }}</span><span class="pr pr-{{ a.priority }}">{{ {'high': 'Высокий', 'medium': 'Средний', 'low': 'Низкий'}[a.priority] }}</span></div>
+                <div class="issue-text">{{ a.text }}</div>
+                <div class="step-metric tnum">{{ a.metric }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="panel empty">Срочных действий не требуется.</div>
+    {% endif %}
+    <p class="note"><b>Как считается.</b> Статус ТО берётся по последней записи ТО единицы техники: просрочено — срок следующего ТО прошёл, скоро — до срока 14 дней или меньше, нет данных — записей о ТО нет. Причины невыполнения группируются по ключевым словам в тексте («транспорт», «занят», «в работе» и т. п.), неподошедшие попадают в «Другое». Отчёт не учитывает то, чего нет в базе: простои техники, затраты и время выполнения работ.</p>
+</section>
+
+{# ============ 08. Выгрузка ============ #}
+<section class="sec no-print" id="export">
+    <div class="sec-head"><div><div class="sec-num">08</div><h2>Выгрузка данных</h2>
+        <p class="sec-lead">Для «Операций» и «ТО» учитывается период; списки техники и оборудования выгружаются полностью на текущую дату. CSV в UTF-8, открывается в Excel.</p></div></div>
+    <div class="panel">
+        <form method="get" action="{{ url_for('reports_export') }}" class="flex flex-wrap items-end gap-3">
+            <label class="field-s">Тип отчёта
+                <select name="type" style="min-width: 220px">
+                    <option value="operations">Операции за период</option>
+                    <option value="maintenance">ТО за период</option>
+                    <option value="machines">Список техники (на дату)</option>
+                    <option value="equipment">Список оборудования (на дату)</option>
+                </select>
+            </label>
+            <label class="field-s">Дата с<input type="date" name="from" value="{{ date_from_default }}"></label>
+            <label class="field-s">Дата по<input type="date" name="to" value="{{ date_to_default }}"></label>
+            <button type="submit" class="btn-p">{{ icon('download') }}Скачать CSV</button>
+            <a class="btn-s" href="{{ url_for('export_inventory_excel') }}">{{ icon('download') }}Полная выгрузка в Excel</a>
+        </form>
+    </div>
+</section>
+
+<p class="mt-8 text-xs text-slate-400 tnum">{{ sclad_name }} · отчёт сформирован {{ generated_at.strftime('%d.%m.%Y %H:%M') }} · период {{ r.date_from|datefmt }} — {{ r.date_to|datefmt }}</p>
 </div>
 
 <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 <script>
-(function(){
-    var colors = ['#2563eb', '#059669', '#7c3aed', '#dc2626', '#ea580c', '#ca8a04', '#0d9488', '#4f46e5'];
-    var eqLabels = {{ eq_chart_labels | tojson }};
-    var eqData = {{ eq_chart_data | tojson }};
-    var eqCtx = document.getElementById('chart-equipment');
-    if (eqCtx && eqLabels.length) {
-        new Chart(eqCtx, {
-            type: 'doughnut',
-            data: {
-                labels: eqLabels,
-                datasets: [{
-                    data: eqData,
-                    backgroundColor: colors.slice(0, eqLabels.length),
-                    borderWidth: 1,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
+(function () {
+    if (!window.Chart) return;
+    var T = {{ r.trend | tojson }};
+    var C = { blue: '#2563eb', slate: '#94a3b8', green: '#16a34a', red: '#dc2626', none: '#e2e8f0', grid: '#f1f5f9', tick: '#94a3b8' };
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = C.tick;
+    function bar(color, label, data, stack) {
+        return { label: label, data: data, backgroundColor: color, hoverBackgroundColor: color, borderRadius: 4, borderSkipped: 'start',
+                 borderColor: '#fff', borderWidth: stack ? { top: 2 } : 0, maxBarThickness: 28, stack: stack };
     }
-    var maintLabels = {{ maint_chart_labels | tojson }};
-    var maintData = {{ maint_chart_data | tojson }};
-    var maintCtx = document.getElementById('chart-maintenance');
-    if (maintCtx) {
-        new Chart(maintCtx, {
-            type: 'bar',
-            data: {
-                labels: maintLabels,
-                datasets: [{
-                    label: 'Проведено ТО',
-                    data: maintData,
-                    backgroundColor: 'rgba(37, 99, 235, 0.6)',
-                    borderColor: 'rgb(37, 99, 235)',
-                    borderWidth: 1
-                }]
+    function opts(stacked) {
+        return {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: { backgroundColor: '#0f172a', padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true,
+                           titleFont: { weight: '600' }, bodyFont: { size: 12 } }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                    x: { maxRotation: 45 }
-                }
+            scales: {
+                x: { stacked: !!stacked, grid: { display: false }, border: { color: '#e2e8f0' }, ticks: { maxRotation: 0, autoSkipPadding: 8 } },
+                y: { stacked: !!stacked, beginAtZero: true, grid: { color: C.grid }, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 5 } }
             }
-        });
+        };
     }
-    var tasksStatusLabels = {{ tasks_status_labels | tojson }};
-    var tasksStatusData = {{ tasks_status_data | tojson }};
-    var tasksStatusCtx = document.getElementById('chart-tasks-status');
-    if (tasksStatusCtx && tasksStatusLabels.length) {
-        new Chart(tasksStatusCtx, {
-            type: 'doughnut',
-            data: {
-                labels: tasksStatusLabels,
-                datasets: [{
-                    data: tasksStatusData,
-                    backgroundColor: ['#f59e0b', '#10b981', '#ef4444'].slice(0, tasksStatusLabels.length),
-                    borderWidth: 1,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { position: 'bottom' } }
-            }
-        });
+    var el;
+    if ((el = document.getElementById('ch-mnt'))) {
+        new Chart(el, { type: 'bar', data: { labels: T.labels, datasets: [bar(C.blue, 'Проведено ТО', T.maintenance)] }, options: opts(false) });
     }
-    var tasksTypeLabels = {{ tasks_type_labels | tojson }};
-    var tasksTypeData = {{ tasks_type_data | tojson }};
-    var tasksTypeCtx = document.getElementById('chart-tasks-type');
-    if (tasksTypeCtx && tasksTypeLabels.length) {
-        new Chart(tasksTypeCtx, {
-            type: 'bar',
-            data: {
-                labels: tasksTypeLabels,
-                datasets: [{
-                    label: 'Заданий',
-                    data: tasksTypeData,
-                    backgroundColor: 'rgba(6, 182, 212, 0.6)',
-                    borderColor: 'rgb(6, 182, 212)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                    x: { maxRotation: 45 }
-                }
-            }
-        });
+    if ((el = document.getElementById('ch-tasks'))) {
+        new Chart(el, { type: 'bar', data: { labels: T.labels, datasets: [
+            bar(C.green, 'Выполнено', T.tasks_done, 's'), bar(C.red, 'Не выполнено', T.tasks_not_done, 's'), bar(C.none, 'Ожидает', T.tasks_pending, 's')
+        ] }, options: (function () {
+            var o = opts(true);
+            o.plugins.tooltip.callbacks = { footer: function (items) {
+                var d = 0, n = 0;
+                items.forEach(function (i) { if (i.datasetIndex === 0) d = i.raw; if (i.datasetIndex === 1) n = i.raw; });
+                return (d + n) ? 'Выполнение: ' + Math.round(100 * d / (d + n)) + '%' : '';
+            } };
+            return o;
+        })() });
     }
+    if ((el = document.getElementById('ch-flow'))) {
+        var o = opts(false);
+        new Chart(el, { type: 'bar', data: { labels: T.labels, datasets: [bar(C.blue, 'Установка', T.install), bar(C.slate, 'Демонтаж', T.remove)] }, options: o });
+    }
+    // Перед печатью графики перерисовываются под ширину листа
+    window.addEventListener('beforeprint', function () { Object.values(Chart.instances).forEach(function (c) { c.resize(); }); });
 })();
 </script>
 {% endblock %}
