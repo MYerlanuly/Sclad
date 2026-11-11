@@ -226,6 +226,8 @@ def code_files():
                 continue
             if name.startswith(".env.") and not name.endswith(".example"):
                 continue  # .env.<код склада> — настройки, не код
+            if not os.path.isfile(os.path.join(dirpath, name)):
+                continue  # сокеты (gunicorn.ctl) и прочие не-файлы
             rel = os.path.relpath(os.path.join(dirpath, name), ROOT).replace(os.sep, "/")
             result.append(rel)
     return sorted(result)
