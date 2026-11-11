@@ -19,7 +19,7 @@ as_app() { sudo -u "$APP_USER" -H env SCLAD_ENV_FILE="$ENV_FILE" SCLAD_BACKUP_SC
 
 step "1. Системные пакеты"
 if ! command -v python3 >/dev/null || ! python3 -c "import venv, ensurepip" 2>/dev/null || ! command -v git >/dev/null; then
-  apt-get update -q && apt-get install -y -q python3 python3-venv python3-pip git curl
+  apt-get update -q && apt-get install -y -q python3 python3-venv python3-pip git
 fi
 echo "  $(python3 --version)"
 
@@ -95,7 +95,7 @@ fi
 
 step "7. Проверка"
 for _ in $(seq 1 20); do
-  if curl -fs -o /dev/null "http://127.0.0.1:$PORT/login"; then
+  if python3 -c "import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=5)" "http://127.0.0.1:$PORT/login" 2>/dev/null; then
     echo
     echo "Готово. Склад открывается с других компьютеров: http://$(hostname -I | awk '{print $1}'):$PORT"
     echo "Обновление в будущем: cd $ROOT && sudo ./update.sh"
