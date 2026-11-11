@@ -110,6 +110,30 @@ def test_lockout_after_5_failed_attempts(app):
     assert "Слишком много неудачных попыток" in resp.get_data(as_text=True)
 
 
+def test_lockout_behind_nginx_is_per_client(app):
+    """За nginx все запросы идут с 127.0.0.1: блокируется только тот, кто ошибался."""
+    bad = app.test_client()
+    bad.environ_base["HTTP_X_FORWARDED_FOR"] = "10.0.0.1"
+    for _ in range(5):
+        login(bad, "admin", "wrong")
+    assert "Слишком много неудачных попыток" in login(bad, "admin", PASSWORD).get_data(as_text=True)
+
+    good = app.test_client()
+    good.environ_base["HTTP_X_FORWARDED_FOR"] = "10.0.0.2"
+    assert login(good, "admin", PASSWORD).status_code == 302
+
+
+def test_forwarded_header_ignored_from_remote_clients(app):
+    """Клиент не за прокси не может обойти блокировку, подставляя X-Forwarded-For."""
+    c = app.test_client()
+    c.environ_base["REMOTE_ADDR"] = "10.0.0.9"
+    for i in range(5):
+        c.environ_base["HTTP_X_FORWARDED_FOR"] = f"10.1.1.{i}"
+        login(c, "admin", "wrong")
+    c.environ_base["HTTP_X_FORWARDED_FOR"] = "10.1.1.99"
+    assert "Слишком много неудачных попыток" in login(c, "admin", PASSWORD).get_data(as_text=True)
+
+
 def test_password_stored_as_hash(app):
     stored = db_scalar("SELECT password_hash FROM users WHERE username = 'admin'")
     assert PASSWORD not in stored
