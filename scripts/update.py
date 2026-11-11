@@ -200,7 +200,7 @@ def pull_code():
 def install_requirements(source=None):
     """Зависимости из requirements.txt. source — папка с requirements.txt и wheels/ (пакет обновления)."""
     base = source or ROOT
-    cmd = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q",
+    cmd = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-cache-dir", "-q",
            "-r", os.path.join(base, "requirements.txt")]
     wheels = os.path.join(base, "wheels")
     if os.path.isdir(wheels):
@@ -226,6 +226,8 @@ def code_files():
                 continue
             if name.startswith(".env.") and not name.endswith(".example"):
                 continue  # .env.<код склада> — настройки, не код
+            if not os.path.isfile(os.path.join(dirpath, name)):
+                continue  # сокеты (gunicorn.ctl) и прочие не-файлы
             rel = os.path.relpath(os.path.join(dirpath, name), ROOT).replace(os.sep, "/")
             result.append(rel)
     return sorted(result)

@@ -53,6 +53,19 @@ def require_admin():
         return redirect(url_for("index"))
 
 
+def _client_ip():
+    """IP пользователя. За nginx на этом же сервере все запросы приходят с 127.0.0.1,
+    поэтому берём адрес, который nginx дописал последним в X-Forwarded-For. Заголовок
+    учитываем только от локального прокси: подделать его извне нельзя."""
+    remote = request.remote_addr or "unknown"
+    if remote in ("127.0.0.1", "::1"):
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        last = forwarded.split(",")[-1].strip()
+        if last:
+            return last
+    return remote
+
+
 def register(app):
     login_manager = LoginManager(app)
     login_manager.login_view = "login"
@@ -147,7 +160,7 @@ def register(app):
         if current_user.is_authenticated:
             return redirect(url_for("index"))
         error = None
-        ip = request.remote_addr or "unknown"
+        ip = _client_ip()
         now_ts = time.time()
         try:
             db = get_db()
