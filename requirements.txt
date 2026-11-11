@@ -4,5 +4,7 @@ flask-login>=0.6.3,<0.7
 flask-wtf>=1.2,<2
 python-dotenv>=1.0,<2
 openpyxl>=3.1,<4
-# Продакшен-сервер (только Linux; на Windows для разработки достаточно `python app.py`)
+# Рабочий сервер на Linux (gunicorn, см. docs/DEPLOY_SERVER.md)
 gunicorn>=23,<26; sys_platform != "win32"
+# Рабочий сервер на Windows (serve.py)
+waitress>=3.0,<4; sys_platform == "win32"

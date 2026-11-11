@@ -4,7 +4,7 @@
 склад, установка на технику и демонтаж, техобслуживание с печатными актами, задания на смену,
 журнал смены инженеров, журнал операций, отчёты, импорт и экспорт, резервные копии базы.
 
-**Технологии:** Python 3.13+, Flask, SQLite, Jinja2, Tailwind, Chart.js. В продакшене: gunicorn за nginx.
+**Технологии:** Python 3.11+ (на сервере Debian 12 — 3.11), Flask, SQLite, Jinja2, Tailwind, Chart.js. В продакшене: gunicorn за nginx.
 
 ## Быстрый старт (Windows, для разработки и проверки)
 
@@ -63,6 +63,8 @@ python app.py --env .env.otdel2
 
 ```
 app.py                 точка входа: python app.py или gunicorn app:app
+serve.py               рабочий запуск на Windows-сервере (waitress)
+update.bat, update.sh  обновление на сервере в один шаг (scripts/update.py)
 sclad/                 код приложения
   __init__.py          create_app(): сборка приложения из модулей
   config.py            пути и константы (база, схема, папка копий)
@@ -93,7 +95,7 @@ sclad/                 код приложения
 schema.sql             базовая схема и справочники
 templates/             HTML-шаблоны (Jinja2)
 static/                логотип, Tailwind и Chart.js (локально, для работы без интернета)
-scripts/               вспомогательные скрипты
+scripts/               вспомогательные скрипты, установка на сервер (windows/, linux/)
 tests/                 автотесты и нагрузочный тест
 docs/                  инструкции по развёртыванию и заметки
 ```
@@ -127,7 +129,15 @@ python -m pytest
 python tests/load_test.py --users 20 --seconds 30
 ```
 
-## Развёртывание
+## Развёртывание и обновление на сервере
+
+Коротко: установка один раз скриптом, дальше новая версия ставится одной командой
+`update.bat` (Windows) или `sudo bash update.sh` (Linux), с копией базы и откатом.
+Для сервера без интернета пакет обновления собирается на рабочем компьютере:
+`python scripts/make_update_package.py`.
+Пошагово: [docs/DEPLOY_SERVER.md](docs/DEPLOY_SERVER.md).
+
+Ручная настройка:
 
 - [docs/DEPLOY_LINUX.md](docs/DEPLOY_LINUX.md): Linux, venv, gunicorn, systemd
 - [docs/DEPLOY_DEBIAN_NGINX.md](docs/DEPLOY_DEBIAN_NGINX.md): Debian с nginx

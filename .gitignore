@@ -11,6 +11,14 @@
 *.sqlite
 backups/
 
+# Служебное: журналы сервера и сведения о последнем обновлении (для отката)
+logs/
+.update-state.json
+.sclad-package.json
+
+# Собранные пакеты обновления (scripts/make_update_package.py)
+dist/
+
 # Python
 __pycache__/
 *.py[cod]
