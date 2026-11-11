@@ -18,6 +18,8 @@ for a in "$@"; do
     cp "$a" "$TMP_ZIP" && chmod 644 "$TMP_ZIP"
     trap 'rm -f "$TMP_ZIP"' EXIT
     a=$TMP_ZIP
+    # Сначала берём из пакета свежий скрипт обновления: исправления в нём действуют сразу
+    python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extract('scripts/update.py', '.')" "$a" || true
   fi
   ARGS+=("$a")
 done
