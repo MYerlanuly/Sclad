@@ -200,7 +200,7 @@ def pull_code():
 def install_requirements(source=None):
     """Зависимости из requirements.txt. source — папка с requirements.txt и wheels/ (пакет обновления)."""
     base = source or ROOT
-    cmd = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "-q",
+    cmd = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-cache-dir", "-q",
            "-r", os.path.join(base, "requirements.txt")]
     wheels = os.path.join(base, "wheels")
     if os.path.isdir(wheels):
