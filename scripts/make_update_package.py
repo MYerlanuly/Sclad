@@ -2,8 +2,8 @@
 
 Запускается на рабочем компьютере с интернетом, в git-клоне проекта:
 
-    python scripts/make_update_package.py                  для Debian 12 (Python 3.11)
-    python scripts/make_update_package.py --python 3.13    если на сервере другой Python
+    python scripts/make_update_package.py                  для рабочего сервера (Python 3.13)
+    python scripts/make_update_package.py --python 3.11    для Debian 12 (Python 3.11)
     python scripts/make_update_package.py --windows        для Windows-сервера
 
 Получается один файл dist/sclad-update-<дата>-<коммит>.zip: код текущей версии (HEAD)
@@ -50,7 +50,7 @@ def server_requirements(windows):
 
 def main():
     parser = argparse.ArgumentParser(description="Пакет обновления склада для сервера без интернета")
-    parser.add_argument("--python", default="3.11", help="версия Python на сервере (по умолчанию 3.11, как в Debian 12)")
+    parser.add_argument("--python", default="3.13", help="версия Python на сервере (по умолчанию 3.13, как на рабочем сервере)")
     parser.add_argument("--windows", action="store_true", help="пакет для Windows-сервера")
     parser.add_argument("--out", default=os.path.join(ROOT, "dist"), help="куда положить пакет")
     args = parser.parse_args()
