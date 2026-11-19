@@ -6,6 +6,7 @@
     <div class="card-header">
         <div class="card-title">Оборудование</div>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('stock_minimums') }}" class="btn btn-secondary">Остатки и минимумы</a>
             <a href="{{ url_for('import_page') }}" class="btn btn-secondary">Массовый ввод</a>
             <a href="{{ url_for('export_inventory_excel') }}" class="btn btn-secondary">Экспорт в Excel</a>
             <a href="{{ url_for('equipment_add') }}" class="btn btn-primary">Добавить оборудование</a>

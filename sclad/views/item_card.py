@@ -2,6 +2,7 @@
 from datetime import date
 
 from ..db import fetch_all
+from ..removal import reason_text
 from .dashboard import OPERATION_LABELS
 
 # Тон плашки статуса (как на карточке борта): ok — зелёный, info — синий, warning — жёлтый,
@@ -20,7 +21,7 @@ def _day(value):
         return None
 
 
-def install_periods(rows):
+def install_periods(rows, kind="equipment"):
     """Установки на борта (новые сверху) со сроком в днях; текущая — с active=True.
 
     rows — строки machine_equipment / machine_sim_cards с inventory_number, model_name, type_name.
@@ -31,6 +32,7 @@ def install_periods(rows):
         p = dict(r)
         start, end = _day(p.get("installed_at")), _day(p.get("removed_at"))
         p["active"] = not p.get("removed_at")
+        p["reason"] = "" if p["active"] else reason_text(kind, p.get("removal_reason"), p.get("removal_comment"))
         if start and p["active"]:
             p["days"] = max(0, (today - start).days)
         elif start and end:

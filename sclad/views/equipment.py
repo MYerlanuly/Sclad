@@ -207,7 +207,7 @@ def register(app):
         periods = install_periods(
             fetch_all(
                 """
-                SELECT me.id AS link_id, me.machine_id, me.installed_at, me.removed_at,
+                SELECT me.id AS link_id, me.machine_id, me.installed_at, me.removed_at, me.removal_reason, me.removal_comment,
                        m.inventory_number, mm.name AS model_name, mt.name AS type_name,
                        sp.code AS position_code, sp.label AS position_label
                 FROM machine_equipment me

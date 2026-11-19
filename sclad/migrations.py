@@ -812,6 +812,40 @@ def migrate_shift_journal():
         conn.close()
 
 
+def migrate_removal_reasons_and_stock_minimums():
+    """Причина демонтажа у установок оборудования и SIM; минимальные остатки склада."""
+    if not os.path.exists(DATABASE):
+        return False
+    conn = sqlite3.connect(DATABASE)
+    try:
+        for table in ("machine_equipment", "machine_sim_cards"):
+            cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+            if not cols:
+                continue
+            for col in ("removal_reason", "removal_comment"):
+                if col not in cols:
+                    try:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+                    except sqlite3.OperationalError as e:
+                        # Параллельный воркер мог уже добавить колонку
+                        if "duplicate column" not in str(e).lower():
+                            raise
+        # Минимальный остаток по наименованию оборудования.
+        # Особое наименование '__sim__' — порог для SIM-карт.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stock_minimums (
+                name TEXT PRIMARY KEY,
+                min_qty INTEGER NOT NULL CHECK (min_qty >= 0)
+            )
+            """
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 MIGRATIONS = (
     migrate_equipment_unique_constraint,
     migrate_sensor_positions_group,
@@ -835,6 +869,7 @@ MIGRATIONS = (
     migrate_shift_tasks_status_not_done,
     migrate_shift_journal,
     migrate_shift_tasks_carry_over,
+    migrate_removal_reasons_and_stock_minimums,
 )
 
 

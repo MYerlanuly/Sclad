@@ -1,3 +1,45 @@
+{# Окно «Снять с борта»: причина демонтажа и комментарий. Одно на страницу, заполняется из формы кнопки «снять». #}
+{% set _status_names = {'equipment': {1: 'На складе', 3: 'Демонтировано', 4: 'Неисправно'}, 'sim': {1: 'На складе', 3: 'Заблокирована'}} %}
+<div class="mc">{# токены цветов карточек заданы на .mc #}
+<dialog id="remove-dialog" class="rm-dialog no-print" aria-labelledby="remove-dialog-title">
+    <form method="dialog" class="rm-body">
+        <h3 id="remove-dialog-title" class="rm-title">Снять с борта</h3>
+        {% for kind, reasons in removal_reasons.items() %}
+        <div class="rm-kind" data-kind="{{ kind }}" hidden>
+            <label for="rm-reason-{{ kind }}">Причина</label>
+            <select id="rm-reason-{{ kind }}" class="rm-reason">
+                {% for code, label, status_id in reasons %}
+                <option value="{{ code }}" data-status="{{ _status_names[kind].get(status_id, '') }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+        <p class="rm-status">Статус после снятия: <b></b></p>
+        <label for="rm-comment">Комментарий <span class="rm-opt">(необязательно)</span></label>
+        <input type="text" id="rm-comment" maxlength="500" placeholder="Например: не передаёт давление, обрыв кабеля">
+        <div class="rm-actions">
+            {# «Снять» первой в разметке: Enter в поле комментария нажимает её, а не «Отмену» #}
+            <button type="submit" value="ok" class="act act-danger">Снять</button>
+            <button type="submit" value="cancel" class="act">Отмена</button>
+        </div>
+    </form>
+</dialog>
+</div>
+<style>
+    .rm-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; border: 1px solid var(--line); border-radius: 12px; padding: 0; width: 380px; max-width: calc(100vw - 32px); box-shadow: 0 20px 48px rgb(15 23 42 / .18); }
+    .rm-dialog::backdrop { background: rgb(15 23 42 / .35); }
+    .rm-body { padding: 18px; margin: 0; }
+    .rm-title { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+    .rm-body label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+    .rm-body select, .rm-body input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: var(--r-ctl); font-size: 13.5px; background: #fff; box-sizing: border-box; }
+    .rm-body select:focus, .rm-body input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 2px rgb(37 99 235 / .2); }
+    .rm-status { margin: 6px 0 12px; font-size: 12px; color: var(--muted); }
+    .rm-status b { color: var(--ink-2); font-weight: 600; }
+    .rm-opt { color: var(--faint); }
+    .rm-actions { display: flex; flex-direction: row-reverse; justify-content: flex-start; gap: 8px; margin-top: 16px; }
+    .act-danger { background: var(--red); border-color: var(--red); color: #fff !important; }
+    .act-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+</style>
 <script>
 (function() {
     // Меню в шапке закрываются по клику мимо; при открытии одного другие закрываются
@@ -9,6 +51,49 @@
             if (!d.open) return;
             var first = d.querySelector('.pick input, .pick select');
             if (first) first.focus();
+        });
+    });
+    // «снять»: спросить причину демонтажа в окне, затем отправить форму с причиной
+    var dlg = document.getElementById('remove-dialog');
+    var pendingForm = null;
+    function activeReason() { return dlg.querySelector('.rm-kind:not([hidden]) .rm-reason'); }
+    function showStatus() {
+        var sel = activeReason();
+        var opt = sel && sel.options[sel.selectedIndex];
+        dlg.querySelector('.rm-status b').textContent = opt ? '«' + opt.getAttribute('data-status') + '»' : '';
+    }
+    if (dlg) {
+        dlg.querySelectorAll('.rm-reason').forEach(function(s) { s.addEventListener('change', showStatus); });
+        dlg.addEventListener('close', function() {
+            var f = pendingForm; pendingForm = null;
+            if (!f || dlg.returnValue !== 'ok') return;
+            var sel = activeReason();
+            [['reason', sel ? sel.value : ''], ['comment', document.getElementById('rm-comment').value]].forEach(function(kv) {
+                var inp = f.querySelector('input[name="' + kv[0] + '"]');
+                if (!inp) { inp = document.createElement('input'); inp.type = 'hidden'; inp.name = kv[0]; f.appendChild(inp); }
+                inp.value = kv[1];
+            });
+            f.submit();
+        });
+    }
+    document.querySelectorAll('.mc form[data-remove]').forEach(function(f) {
+        f.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var question = f.getAttribute('data-question') || 'Снять с борта?';
+            if (!dlg || typeof dlg.showModal !== 'function') {
+                if (confirm(question)) f.submit();
+                return;
+            }
+            var kind = f.getAttribute('data-remove') || 'equipment';
+            dlg.querySelectorAll('.rm-kind').forEach(function(k) { k.hidden = k.getAttribute('data-kind') !== kind; });
+            var sel = activeReason(); if (sel) sel.selectedIndex = 0;
+            document.getElementById('rm-comment').value = '';
+            dlg.querySelector('.rm-title').textContent = question;
+            showStatus();
+            pendingForm = f;
+            dlg.returnValue = '';
+            dlg.showModal();
+            if (sel) sel.focus();
         });
     });
     // Кнопка «скопировать» рядом с ICCID, IP, серийным номером

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Остатки на складе{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('equipment_list'), 'Оборудование'), (none, 'Остатки')]) }}{% endblock %}
+{% block content %}
+<style>
+    .st-tabs { display: inline-flex; gap: 4px; padding: 3px; border-radius: 0.5rem; background: #f1f5f9; margin-bottom: 0.75rem; }
+    .st-tabs a { padding: 0.3rem 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; color: #475569; text-decoration: none; }
+    .st-tabs a.on { background: #fff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+    .st-table td.num, .st-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .st-table input { width: 5.5rem; padding: 0.3rem 0.5rem; font-size: 0.875rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; text-align: right; }
+    .st-table input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgb(37 99 235 / .2); }
+    .st-table tr.short td { background: #fef2f2; }
+    .st-free-short { color: #b91c1c; font-weight: 700; }
+    .st-pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+    .st-ok { background: #dcfce7; color: #15803d; }
+    .st-bad { background: #fee2e2; color: #b91c1c; }
+    .st-none { color: #94a3b8; font-size: 0.8125rem; }
+    .st-scroll { overflow-x: auto; }
+    .st-sim td { border-top: 2px solid #e2e8f0; }
+</style>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Остатки на складе</div>
+        <a href="{{ url_for('equipment_list') }}" class="btn btn-secondary">← К оборудованию</a>
+    </div>
+    <p class="muted mb-3">«На складе» — свободное со статусом «На складе», только его можно установить. Задайте минимум, и если на складе станет меньше, на главной появится плитка «Пора заказывать». Пусто или 0 — без контроля.</p>
+
+    <div class="st-tabs" role="tablist">
+        <a href="{{ url_for('stock_minimums') }}" class="{{ 'on' if not only_short }}">Все · {{ total_rows }}</a>
+        <a href="{{ url_for('stock_minimums', only='short') }}" class="{{ 'on' if only_short }}">Не хватает · {{ short_count }}</a>
+    </div>
+
+    {% if rows %}
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="st-scroll">
+        <table class="st-table">
+            <thead>
+                <tr>
+                    <th>Наименование</th>
+                    <th class="num">На складе</th>
+                    <th class="num">Установлено</th>
+                    <th class="num" title="Оборудование «Неисправно», SIM «Заблокирована»">Неисправно</th>
+                    <th class="num">Минимум</th>
+                    <th>Состояние</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr class="{{ 'short' if r.deficit }} {{ 'st-sim' if r.is_sim }}">
+                    <td>{% if r.is_sim %}<a href="{{ url_for('sim_cards_list', status=1) }}">{{ r.name }}</a>{% else %}<a href="{{ url_for('equipment_list', q=r.name, status=1) }}">{{ r.name }}</a>{% endif %}</td>
+                    <td class="num {{ 'st-free-short' if r.deficit }}">{{ r.free }}</td>
+                    <td class="num">{{ r.installed }}</td>
+                    <td class="num">{{ r.faulty }}</td>
+                    <td class="num">
+                        {% if can_edit %}<input type="number" name="min__{{ r.key }}" min="0" max="100000" step="1" inputmode="numeric" value="{{ r.min_qty or '' }}" placeholder="—" aria-label="Минимум: {{ r.name }}">
+                        {% else %}{{ r.min_qty or '—' }}{% endif %}
+                    </td>
+                    <td>
+                        {% if r.deficit %}<span class="st-pill st-bad">не хватает {{ r.deficit }}</span>
+                        {% elif r.min_qty %}<span class="st-pill st-ok">норма</span>
+                        {% else %}<span class="st-none">без контроля</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% if can_edit %}<p class="mt-4"><button type="submit" class="btn btn-primary">Сохранить минимумы</button></p>{% endif %}
+    </form>
+    {% else %}
+    <p class="muted">{% if only_short %}Всего хватает: ни одно наименование не ниже минимума.{% else %}Оборудования пока нет.{% endif %}</p>
+    {% endif %}
+</div>
+{% endblock %}

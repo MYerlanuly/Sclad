@@ -15,6 +15,7 @@
 {% elif name == 'search' %}<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
 {% elif name == 'book' %}<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V21h16"/>
 {% elif name == 'download' %}<path d="M12 4v12M6 10l6 6 6-6M4 20h16"/>
+{% elif name == 'box' %}<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>
 {% elif name == 'chevron' %}<path d="m6 9 6 6 6-6"/>
 {% endif %}
 </svg>
@@ -152,11 +153,13 @@
 </section>
 
 {# ---------- Показатели: сначала критичные ---------- #}
-<section class="mb-5 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3" aria-label="Требует внимания">
+<section class="mb-5 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" aria-label="Требует внимания">
     {{ kpi(maintenance_counts.overdue, 'Просрочено ТО', url_for('maintenance_list', status='overdue'), 'critical', 'wrench') }}
     {{ kpi(inv.equipment_broken, 'Неисправное оборудование', url_for('equipment_list', status=4), 'critical', 'alert') }}
     {{ kpi(open_past, 'Не закрыто с прошлых смен', url_for('shift_tasks_list'), 'warning', 'clock', 'Не выполненные и не перенесённые задания прошлых смен') }}
     {{ kpi(maintenance_counts.due_soon, 'ТО в ближайшие 14 дней', url_for('maintenance_list', status='due_soon'), 'warning', 'calendar') }}
+    {% set short_hint = stock_short|map(attribute='name')|join(', ') %}
+    {{ kpi(stock_short|length, 'Пора заказывать', url_for('stock_minimums', only='short'), 'warning', 'box', ('Ниже минимума: ' ~ short_hint) if short_hint else 'Минимальные остатки: настроить') }}
     {{ kpi(shift_counts.pending, 'Ждут в эту смену', url_for('shift_tasks_list', date=cur_date, shift=cur_shift, status='pending'), 'info', 'list') }}
 </section>
 

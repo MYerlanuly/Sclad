@@ -2,7 +2,7 @@
 {% block title %}{{ equipment.name }} {{ equipment.serial_number }}{% endblock %}
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('equipment_list'), 'Оборудование'), (none, equipment.name ~ ' (' ~ (equipment.serial_number or '') ~ ')')]) }}{% endblock %}
 {% block content %}
-{% from "_card_kit.html" import icon, remove_btn, post_action, copy_val with context %}
+{% from "_card_kit.html" import icon, remove_btn, replace_link, post_action, copy_val with context %}
 {% include "_card_styles.html" %}
 {% set e = equipment %}
 {% set is_sensor = e.equipment_kind == 'sensor' %}
@@ -15,9 +15,9 @@
     <div class="flex-1 min-w-0">
         <div class="truncate"><a href="{{ url_for('machine_detail', machine_id=p.machine_id) }}" class="lnk tnum">{{ p.inventory_number }}</a>
             <span class="meta">{{ [p.type_name, p.model_name]|select|join(' · ') }}</span></div>
-        <div class="meta tnum">{% if p.active %}с {{ p.installed_at | datefmt }} · <span class="text-green-700 font-medium">стоит сейчас</span>{% else %}{{ p.installed_at | datefmt }} — {{ p.removed_at | datefmt }}{% endif %}{% if p.days is not none %} · {{ p.days }} дн.{% endif %}{% if p.position_code %} · позиция <span title="{{ p.position_label or '' }}">{{ p.position_code }}</span>{% endif %}</div>
+        <div class="meta tnum">{% if p.active %}с {{ p.installed_at | datefmt }} · <span class="text-green-700 font-medium">стоит сейчас</span>{% else %}{{ p.installed_at | datefmt }} — {{ p.removed_at | datefmt }}{% if p.reason %} · <span class="text-slate-600" title="Причина снятия">{{ p.reason }}</span>{% endif %}{% endif %}{% if p.days is not none %} · {{ p.days }} дн.{% endif %}{% if p.position_code %} · позиция <span title="{{ p.position_label or '' }}">{{ p.position_code }}</span>{% endif %}</div>
     </div>
-    {% if p.active and can_edit %}{{ remove_btn(url_for('remove_equipment', machine_id=p.machine_id, link_id=p.link_id), '«' ~ e.name ~ '» ' ~ e.serial_number, question='Снять «' ~ e.name ~ '» ' ~ e.serial_number ~ ' с борта ' ~ p.inventory_number ~ '? Статус станет «Демонтировано».', back='card') }}{% endif %}
+    {% if p.active and can_edit %}<span class="row-acts">{{ replace_link(p.machine_id, p.link_id, '«' ~ e.name ~ '» ' ~ e.serial_number) }}{{ remove_btn(url_for('remove_equipment', machine_id=p.machine_id, link_id=p.link_id), '«' ~ e.name ~ '» ' ~ e.serial_number, question='Снять «' ~ e.name ~ '» ' ~ e.serial_number ~ ' с борта ' ~ p.inventory_number ~ '?', back='card') }}</span>{% endif %}
 </li>
 {% endmacro %}
 

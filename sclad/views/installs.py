@@ -5,7 +5,13 @@ from datetime import datetime
 from flask import flash, redirect, render_template, request, url_for
 
 from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
+from ..removal import EQUIPMENT_REMOVAL_REASONS, parse_removal, reason_text
 from ..utils import to_int
+
+# id статусов из schema.sql: для сообщений после демонтажа
+EQUIPMENT_STATUS_NAMES = {1: "На складе", 2: "Установлено", 3: "Демонтировано", 4: "Неисправно", 5: "Списано"}
+SIM_STATUS_NAMES = {1: "На складе", 2: "Установлена", 3: "Заблокирована", 4: "Списана"}
+REPLACE_LIST_LIMIT = 100
 
 
 def register(app):
@@ -162,6 +168,18 @@ def register(app):
             pagination=pagination,
         )
 
+    def _remove_equipment_link(db, link, reason, comment, status_id, now):
+        """Снять оборудование с борта (без commit): дата, причина и новый статус."""
+        db.execute(
+            "UPDATE machine_equipment SET removed_at = ?, removal_reason = ?, removal_comment = ? WHERE id = ?",
+            (now, reason, comment, link["id"]),
+        )
+        db.execute("UPDATE equipment SET status_id = ? WHERE id = ?", (status_id, link["equipment_id"]))
+
+    def _removal_log_suffix(kind, reason, comment):
+        text = reason_text(kind, reason, comment)
+        return f". Причина: {text}" if text else ""
+
     @app.route("/machines/<int:machine_id>/remove_equipment/<int:link_id>", methods=["POST"])
     def remove_equipment(machine_id, link_id):
         db = get_db()
@@ -173,15 +191,9 @@ def register(app):
             flash("Связь оборудование-техника не найдена или уже демонтирована.", "error")
             return redirect(url_for("machine_detail", machine_id=machine_id))
 
+        reason, comment, status_id = parse_removal(request.form, "equipment")
         now = datetime.now().isoformat(sep=" ", timespec="seconds")
-        db.execute(
-            "UPDATE machine_equipment SET removed_at = ? WHERE id = ?",
-            (now, link_id),
-        )
-        db.execute(
-            "UPDATE equipment SET status_id = 3 WHERE id = ?",
-            (link["equipment_id"],),
-        )
+        _remove_equipment_link(db, link, reason, comment, status_id, now)
         db.commit()
         machine = fetch_one("SELECT inventory_number FROM machines WHERE id = ?", (machine_id,))
         inv_num = machine["inventory_number"] if machine else str(machine_id)
@@ -191,12 +203,132 @@ def register(app):
             "remove",
             "equipment",
             int(link["equipment_id"]),
-            f"Демонтаж оборудования «{eq_name}» с техники {inv_num}",
+            f"Демонтаж оборудования «{eq_name}» с техники {inv_num}"
+            + _removal_log_suffix("equipment", reason, comment),
         )
-        flash("Оборудование демонтировано.", "success")
+        status_name = EQUIPMENT_STATUS_NAMES.get(status_id, "")
+        flash(f"Оборудование демонтировано. Статус: «{status_name}».", "success")
         if request.form.get("back") == "card":
             return redirect(url_for("equipment_detail", equipment_id=link["equipment_id"]))
         return redirect(url_for("machine_detail", machine_id=machine_id))
+
+    @app.route("/machines/<int:machine_id>/replace_equipment/<int:link_id>", methods=["GET", "POST"])
+    def replace_equipment(machine_id, link_id):
+        """Замена в один шаг: снять установленное и поставить свободное со склада на то же место."""
+        machine = fetch_one("SELECT * FROM machines WHERE id = ?", (machine_id,))
+        old = fetch_one(
+            """
+            SELECT me.id, me.equipment_id, me.sensor_position_id, me.installed_at,
+                   e.name, e.serial_number, e.equipment_kind,
+                   sp.code AS position_code, sp.label AS position_label
+            FROM machine_equipment me
+            JOIN equipment e ON me.equipment_id = e.id
+            LEFT JOIN sensor_positions sp ON me.sensor_position_id = sp.id
+            WHERE me.id = ? AND me.machine_id = ? AND me.removed_at IS NULL
+            """,
+            (link_id, machine_id),
+        )
+        if machine is None or old is None:
+            flash("Установка не найдена или оборудование уже снято.", "error")
+            if machine is None:
+                return redirect(url_for("machines_list"))
+            return redirect(url_for("machine_detail", machine_id=machine_id))
+
+        kind = old["equipment_kind"] or "other"
+        if request.method == "POST":
+            new_id = to_int(request.form.get("equipment_id"))
+            reason, comment, status_id = parse_removal(request.form, "equipment")
+            new = fetch_one("SELECT id, name, serial_number, status_id, equipment_kind FROM equipment WHERE id = ?", (new_id,)) if new_id else None
+            new_busy = new_id and fetch_one(
+                "SELECT 1 FROM machine_equipment WHERE equipment_id = ? AND removed_at IS NULL", (new_id,)
+            )
+            if not new_id:
+                flash("Выберите, что поставить взамен.", "error")
+            elif reason is None:
+                flash("Укажите причину замены.", "error")
+            elif new is None:
+                flash("Оборудование не найдено.", "error")
+            elif new_busy or new["status_id"] != 1:
+                flash("Это оборудование уже установлено или не числится на складе.", "error")
+            elif (new["equipment_kind"] or "other") != kind:
+                flash("Датчик меняется только на датчик, прочее оборудование только на прочее.", "error")
+            else:
+                db = get_db()
+                now = datetime.now().isoformat(sep=" ", timespec="seconds")
+                try:
+                    _remove_equipment_link(db, old, reason, comment, status_id, now)
+                    db.execute(
+                        """
+                        INSERT INTO machine_equipment (machine_id, equipment_id, installed_at, sensor_position_id)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (machine_id, new_id, now, old["sensor_position_id"]),
+                    )
+                    db.execute("UPDATE equipment SET status_id = 2 WHERE id = ?", (new_id,))
+                    db.commit()
+                except sqlite3.IntegrityError:
+                    db.rollback()
+                    flash("Не удалось заменить: оборудование только что заняли. Попробуйте ещё раз.", "error")
+                    return redirect(url_for("replace_equipment", machine_id=machine_id, link_id=link_id))
+                inv = machine["inventory_number"]
+                where = f" на позиции {old['position_code']}" if old["position_code"] else ""
+                log_operation(
+                    "remove",
+                    "equipment",
+                    int(old["equipment_id"]),
+                    f"Замена: демонтаж «{old['name']}» {old['serial_number']} с техники {inv}{where}"
+                    + _removal_log_suffix("equipment", reason, comment),
+                )
+                log_operation(
+                    "install",
+                    "equipment",
+                    int(new_id),
+                    f"Замена: установка «{new['name']}» {new['serial_number']} на технику {inv}{where} "
+                    f"вместо {old['serial_number']}",
+                )
+                flash(
+                    f"Заменено: {old['serial_number']} → {new['serial_number']}. "
+                    f"Снятое получило статус «{EQUIPMENT_STATUS_NAMES.get(status_id, '')}».",
+                    "success",
+                )
+                return redirect(url_for("machine_detail", machine_id=machine_id))
+
+        # Свободное оборудование того же вида; то же наименование — первым
+        q = (request.args.get("q") or "").strip()
+        where_sql = [
+            "e.status_id = 1",
+            "COALESCE(e.equipment_kind, 'other') = ?",
+            "NOT EXISTS (SELECT 1 FROM machine_equipment me WHERE me.equipment_id = e.id AND me.removed_at IS NULL)",
+        ]
+        params = [kind]
+        if q:
+            where_sql.append("(e.name LIKE ? OR e.serial_number LIKE ? OR IFNULL(e.description, '') LIKE ?)")
+            like = f"%{q}%"
+            params.extend([like, like, like])
+        where_clause = " AND ".join(where_sql)
+        total = fetch_one(f"SELECT COUNT(*) AS c FROM equipment e WHERE {where_clause}", tuple(params))["c"]
+        candidates = fetch_all(
+            f"""
+            SELECT e.id, e.name, e.serial_number, e.description
+            FROM equipment e
+            WHERE {where_clause}
+            ORDER BY CASE WHEN e.name = ? COLLATE NOCASE THEN 0 ELSE 1 END, e.name, e.serial_number
+            LIMIT ?
+            """,
+            (*params, old["name"], REPLACE_LIST_LIMIT),
+        )
+        return render_template(
+            "replace_equipment.html",
+            machine=machine,
+            old=old,
+            candidates=candidates,
+            total=total,
+            limit=REPLACE_LIST_LIMIT,
+            reasons=EQUIPMENT_REMOVAL_REASONS,
+            selected_reason=request.form.get("reason") or "faulty",
+            selected_id=to_int(request.form.get("equipment_id")),
+            comment=request.form.get("comment") or "",
+        )
 
     # --- SIM installation on machine ---
     @app.route("/machines/<int:machine_id>/install_sim", methods=["GET", "POST"])
@@ -322,15 +454,16 @@ def register(app):
             flash("Связь SIM-карта-техника не найдена или уже демонтирована.", "error")
             return redirect(url_for("machine_detail", machine_id=machine_id))
 
+        reason, comment, status_id = parse_removal(request.form, "sim")
         now = datetime.now().isoformat(sep=" ", timespec="seconds")
         db.execute(
-            "UPDATE machine_sim_cards SET removed_at = ? WHERE id = ?",
-            (now, link_id),
+            "UPDATE machine_sim_cards SET removed_at = ?, removal_reason = ?, removal_comment = ? WHERE id = ?",
+            (now, reason, comment, link_id),
         )
-        # Статус SIM -> На складе (id=1)
+        # Статус SIM по причине: обычно «На складе» (1), неисправная или заблокированная — «Заблокирована» (3)
         db.execute(
-            "UPDATE sim_cards SET status_id = 1 WHERE id = ?",
-            (link["sim_card_id"],),
+            "UPDATE sim_cards SET status_id = ? WHERE id = ?",
+            (status_id, link["sim_card_id"]),
         )
         db.commit()
         machine = fetch_one("SELECT inventory_number FROM machines WHERE id = ?", (machine_id,))
@@ -341,9 +474,9 @@ def register(app):
             "remove",
             "sim_card",
             int(link["sim_card_id"]),
-            f"Демонтаж SIM-карты {phone} с техники {inv_num}",
+            f"Демонтаж SIM-карты {phone} с техники {inv_num}" + _removal_log_suffix("sim", reason, comment),
         )
-        flash("SIM-карта демонтирована.", "success")
+        flash(f"SIM-карта демонтирована. Статус: «{SIM_STATUS_NAMES.get(status_id, '')}».", "success")
         if request.form.get("back") == "card":
             return redirect(url_for("sim_card_detail", sim_id=link["sim_card_id"]))
         return redirect(url_for("machine_detail", machine_id=machine_id))

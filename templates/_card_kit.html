@@ -27,14 +27,20 @@
 </svg>
 {% endmacro %}
 
-{# Кнопка демонтажа: маленькая, с подтверждением; показывать только тем, кто может менять данные.
+{# Кнопка демонтажа: маленькая; по нажатию открывается окно с причиной (см. _card_script.html).
+   kind='equipment' или 'sim' — какой список причин показать.
    back='card' — после демонтажа вернуться в карточку оборудования/SIM, а не борта. #}
-{% macro remove_btn(action, what, question=none, back=none) %}
-<form method="post" action="{{ action }}" class="no-print shrink-0" onsubmit="return confirm({{ (question or ('Демонтировать ' ~ what ~ '? Оно вернётся на склад.'))|tojson|forceescape }});">
+{% macro remove_btn(action, what, question=none, back=none, kind='equipment') %}
+<form method="post" action="{{ action }}" class="no-print shrink-0" data-remove="{{ kind }}" data-question="{{ question or ('Снять ' ~ what ~ ' с борта?') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
     <button type="submit" class="row-del" title="Демонтировать: снять с борта" aria-label="Демонтировать {{ what }}">снять</button>
 </form>
+{% endmacro %}
+
+{# Ссылка «заменить»: снять и поставить другое со склада на то же место за один шаг #}
+{% macro replace_link(machine_id, link_id, what) %}
+<a href="{{ url_for('replace_equipment', machine_id=machine_id, link_id=link_id) }}" class="row-del row-swap no-print shrink-0" title="Заменить: снять и поставить другое со склада" aria-label="Заменить {{ what }}">заменить</a>
 {% endmacro %}
 
 {# Кнопка-действие (POST) для меню и шапки: смена статуса, удаление #}
