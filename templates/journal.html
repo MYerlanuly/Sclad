@@ -24,6 +24,8 @@
     .jd-check { padding-top: 0.45rem; }
     .jd-check input { width: 16px; height: 16px; accent-color: #2563eb; }
     .jd-time { flex: none; width: 3rem; padding-top: 0.35rem; font-size: 0.875rem; font-variant-numeric: tabular-nums; color: #475569; }
+    .jd-time-input { flex: none; width: 4.25rem; padding: 0.35rem 0.4rem; font-size: 0.875rem; font-variant-numeric: tabular-nums; text-align: center; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: #fff; }
+    .jd-time-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgb(37 99 235 / .2); }
     .jd-fields { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
     @media (min-width: 900px) { .jd-fields { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
     .jd-fields input { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.875rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: #fff; box-sizing: border-box; }
@@ -150,10 +152,11 @@
                 {% for d in drafts %}
                     <li class="{{ 'jd-done' if d.already }}">
                         <label class="jd-check"><input type="checkbox" name="pick" value="{{ d.key }}" {% if d.already %}disabled{% else %}checked{% endif %} aria-label="Добавить: {{ d.content }}"></label>
-                        <span class="jd-time">{{ d.time }}</span>
                         {% if d.already %}
+                        <span class="jd-time">{{ d.time }}</span>
                         <span class="jd-text">{{ d.content }}{% if d.note %} <span class="jd-note">· {{ d.note }}</span>{% endif %} <span class="jd-in">уже в журнале</span></span>
                         {% else %}
+                        <input type="text" name="time__{{ d.key }}" value="{{ d.time }}" class="jd-time-input" required pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" inputmode="numeric" aria-label="Время">
                         <span class="jd-fields">
                             <input type="text" name="content__{{ d.key }}" value="{{ d.content }}" aria-label="Содержание">
                             <input type="text" name="note__{{ d.key }}" value="{{ d.note }}" placeholder="Примечание" aria-label="Примечание" class="jd-note-input">

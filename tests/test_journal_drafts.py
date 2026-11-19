@@ -144,3 +144,20 @@ def test_drafts_add_rejects_other_shift_and_unknown_keys(clock, client_for, seed
 
 def test_empty_shift_has_no_panel(clock, client_for, seed):
     assert "Выполнено за смену" not in client_for("editor").get("/journal").get_data(as_text=True)
+
+
+def test_draft_time_editable(clock, client_for, seed):
+    _seed_shift(seed)
+    c = client_for("maintenance")
+    html = c.get("/journal").get_data(as_text=True)
+    keys = re.findall(r'name="pick" value="([^"]+)"', html)
+    rep = next(k for k in keys if k.startswith("rep-"))
+    task = next(k for k in keys if k.startswith("task-"))
+    assert f'name="time__{rep}" value="11:05"' in html
+    html = c.post("/journal/drafts/add", data={
+        "date": "2026-11-10", "shift": "day", "pick": [rep, task],
+        f"time__{rep}": "11:30", f"time__{task}": "25:99",
+    }, follow_redirects=True).get_data(as_text=True)
+    assert "Не добавлено строк: 1" in html
+    rows = db_query("SELECT entry_time, source_key FROM journal_entries")
+    assert [(r["entry_time"], r["source_key"]) for r in rows] == [("11:30", rep)]

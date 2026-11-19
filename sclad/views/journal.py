@@ -120,26 +120,31 @@ def register(app):
         _, entries = sj.load_shift(get_db(), shift, shift_date)
         picked = set(request.form.getlist("pick"))
         db = get_db()
-        added = 0
+        added = skipped = 0
         for d in collect_drafts(shift, shift_date, entries):
             if d["key"] not in picked or d["already"]:
                 continue
             content = " ".join((request.form.get(f"content__{d['key']}") or d["content"]).split())[:2000]
             note = " ".join((request.form.get(f"note__{d['key']}") or "").split())[:1000]
-            if not content:
+            raw_time = request.form.get(f"time__{d['key']}")
+            entry_time = sj.normalize_time(raw_time) if raw_time else d["time"]
+            if not content or not entry_time:
+                skipped += 1
                 continue
             cur = db.execute(
                 """
                 INSERT INTO journal_entries (shift_date, shift, entry_time, content, note, created_by_user_id, source_key)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (shift_date, shift, d["time"], content, note, current_user.id, d["key"]),
+                (shift_date, shift, entry_time, content, note, current_user.id, d["key"]),
             )
             log_operation("create", "journal_entry", cur.lastrowid,
-                          f"Журнал смены {sj.title_for(shift, shift_date)}, {d['time']}: {content[:200]}")
+                          f"Журнал смены {sj.title_for(shift, shift_date)}, {entry_time}: {content[:200]}")
             added += 1
         db.commit()
-        flash(f"Добавлено в журнал записей: {added}." if added else "Ничего не выбрано.", "success" if added else "info")
+        if skipped:
+            flash(f"Не добавлено строк: {skipped} — проверьте время (ЧЧ:ММ) и текст.", "error")
+        flash(f"Добавлено в журнал записей: {added}." if added else "Ничего не добавлено.", "success" if added else "info")
         return _back(shift, shift_date)
 
     def _entry_for_change(entry_id):
