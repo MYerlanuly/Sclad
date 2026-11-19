@@ -154,6 +154,7 @@ def test_replace_already_removed_link(admin, seed):
 
 
 def test_replace_forbidden_for_maintenance_and_reader(client_for, seed):
+    """Без задания на смену: reader и maintenance не меняют (maintenance — только из задания)."""
     link = _install_eq(seed["machine"], seed["sensor"], position=3)
     for role in ("maintenance", "reader"):
         c = client_for(role)

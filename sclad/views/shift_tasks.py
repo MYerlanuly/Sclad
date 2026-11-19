@@ -613,9 +613,9 @@ def register(app):
             flash("Задание отмечено как не выполненное. Перенесите его на другую смену.", "error")
             return redirect(url_for("shift_tasks_list"))
         if request.method == "GET":
-            # Задание по борту: редактор может сразу провести замену, задание закроется само
+            # Задание по борту: исполнитель может сразу провести замену, задание закроется само
             installed = []
-            if task["machine_id"] and current_user.can_edit:
+            if task["machine_id"] and (current_user.can_edit or current_user.role == "maintenance"):
                 installed = [
                     dict(r)
                     for r in fetch_all(
