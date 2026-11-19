@@ -1,0 +1,160 @@
+{# Рисунки техники и SIM-карты — встроенные SVG (приложение работает без интернета).
+   machine_art(kind) — вид сбоку, kind из фильтра machine_kind: dump_truck, excavator, dozer, loader, drill, grader, tanker, locomotive, other.
+   sim_art(phone, operator, iccid, tone) — SIM-карта; tone: blue, green, red, slate. #}
+
+{% set Y = '#f2b632' %}{% set Y2 = '#f7c95a' %}{% set SH = '#d18f12' %}{% set O = '#3b4453' %}
+{% set T = '#262e3a' %}{% set G = '#cfe7f5' %}{% set FR = '#4a5566' %}
+
+{% macro far_wheel(cx, cy, r) -%}
+<circle cx="{{ cx + 7 }}" cy="{{ cy - 3 }}" r="{{ r }}" fill="#161b22"/>
+{%- endmacro %}
+
+{% macro wheel(cx, cy, r, u) -%}
+<g><circle cx="{{ cx }}" cy="{{ cy }}" r="{{ r }}" fill="url(#{{ u }}t)"/><circle cx="{{ cx }}" cy="{{ cy }}" r="{{ r - 3 }}" fill="none" stroke="#3a4454" stroke-width="2" stroke-dasharray="3 4"/><circle cx="{{ cx }}" cy="{{ cy }}" r="{{ (r * 0.52)|round(1) }}" fill="url(#{{ u }}h)"/><circle cx="{{ cx }}" cy="{{ cy }}" r="{{ (r * 0.22)|round(1) }}" fill="#4b5563"/></g>
+{%- endmacro %}
+
+{% macro track(x, y, w, h=22) -%}
+<g><rect x="{{ x + 7 }}" y="{{ y - 4 }}" width="{{ w }}" height="{{ h }}" rx="{{ h / 2 }}" fill="#161b22"/>
+<rect x="{{ x }}" y="{{ y }}" width="{{ w }}" height="{{ h }}" rx="{{ h / 2 }}" fill="{{ T }}"/>
+{% for i in range(((w - h) / 18)|int + 1) %}<circle cx="{{ x + h / 2 + i * 18 }}" cy="{{ y + h / 2 }}" r="{{ h / 2 - 5 }}" fill="#5b677d" stroke="#3a4454" stroke-width="1.5"/>{% endfor %}
+<rect x="{{ x + 4 }}" y="{{ y + 2 }}" width="{{ w - 8 }}" height="2" rx="1" fill="#3a4454"/></g>
+{%- endmacro %}
+
+{% macro machine_art(kind, cls='', title='') -%}
+<svg class="{{ cls }}" data-kind="{{ kind }}" viewBox="0 0 240 130" role="img" aria-label="{{ title or 'Рисунок техники' }}" xmlns="http://www.w3.org/2000/svg">
+{% set u = 'ma' ~ range(1000000)|random %}
+<defs>
+<linearGradient id="{{ u }}y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fad466"/><stop offset=".55" stop-color="#f2b632"/><stop offset="1" stop-color="#df9d18"/></linearGradient>
+<linearGradient id="{{ u }}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde08a"/><stop offset="1" stop-color="#efb53a"/></linearGradient>
+<linearGradient id="{{ u }}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf6fd"/><stop offset="1" stop-color="#a9cfe6"/></linearGradient>
+<linearGradient id="{{ u }}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9583a"/><stop offset="1" stop-color="#a5361f"/></linearGradient>
+<radialGradient id="{{ u }}t" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#4a5566"/><stop offset="1" stop-color="#1c222b"/></radialGradient>
+<radialGradient id="{{ u }}h" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#8d99aa"/></radialGradient>
+<radialGradient id="{{ u }}s" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#0f172a" stop-opacity=".22"/><stop offset="1" stop-color="#0f172a" stop-opacity="0"/></radialGradient>
+</defs>
+<ellipse cx="122" cy="119" rx="116" ry="8" fill="url(#{{ u }}s)"/>
+{% if kind == 'dump_truck' %}
+{{ far_wheel(72, 97, 23) }}{{ far_wheel(186, 97, 23) }}
+<rect x="34" y="82" width="182" height="9" rx="2" fill="{{ FR }}"/>
+<path d="M14 34 H156 V82 H40 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M33 70 H156 V82 H40 Z" fill="{{ SH }}"/>
+<path d="M60 38 V78 M92 38 V78 M124 38 V78" stroke="{{ SH }}" stroke-width="3" stroke-linecap="round"/>
+<path d="M156 34 L218 27 V35 L156 45 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="166" y="48" width="34" height="32" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="180" y="52" width="16" height="14" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="200" y="58" width="16" height="26" rx="2" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M204 63 H212 M204 68 H212 M204 73 H212" stroke="{{ O }}" stroke-width="1.2"/>
+<path d="M207 86 L213 104 M211 86 L217 104 M208.5 92 H213 M210.5 98 H215" stroke="{{ O }}" stroke-width="1.3"/>
+{{ wheel(72, 97, 23, u) }}{{ wheel(186, 97, 23, u) }}
+{% elif kind == 'excavator' %}
+{{ track(24, 96, 140) }}
+<rect x="40" y="88" width="108" height="9" fill="{{ FR }}"/>
+<rect x="34" y="58" width="114" height="31" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M22 62 H44 V89 H22 Q17 75.5 22 62 Z" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M58 66 V82 M66 66 V82 M74 66 V82 M82 66 V82" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="116" y="32" width="32" height="28" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="123" y="36" width="20" height="15" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M132 74 L176 38" stroke="#a3afbf" stroke-width="4" stroke-linecap="round"/>
+<path d="M140 64 L184 20 L198 26 L156 74 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M186 21 L199 19 L224 70 L213 75 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M207 70 L233 74 L229 101 L211 105 Q200 90 207 70 Z" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M213 105 L210 111 M219 104 L217 110 M225 103 L224 109" stroke="{{ O }}" stroke-width="2.5" stroke-linecap="round"/>
+{% elif kind == 'dozer' %}
+{{ track(32, 94, 144, 24) }}
+<path d="M48 60 H150 L162 70 V94 H42 V66 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M108 66 V88 M116 66 V88 M124 66 V88 M132 66 V88" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="56" y="28" width="42" height="34" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="62" y="33" width="14" height="16" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="79" y="33" width="14" height="16" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="138" y="44" width="5" height="17" rx="1" fill="{{ O }}"/>
+<path d="M150 100 L190 98" stroke="{{ Y }}" stroke-width="8" stroke-linecap="round"/>
+<path d="M188 52 Q178 85 189 117 H201 Q191 85 200 52 Z" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M34 76 L18 80 L15 112 H22 L25 87 L34 85 Z" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+{% elif kind == 'loader' %}
+{{ far_wheel(64, 96, 24) }}{{ far_wheel(170, 96, 24) }}
+<path d="M26 56 H108 V88 H30 Q21 72 26 56 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M36 62 V82 M44 62 V82 M52 62 V82" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="84" y="22" width="36" height="38" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="91" y="27" width="24" height="18" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="106" y="62" width="70" height="22" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M120 64 L194 46 L199 55 L126 75 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M140 74 L190 58" stroke="#a3afbf" stroke-width="4" stroke-linecap="round"/>
+<path d="M192 36 L230 42 L226 80 L198 77 Q186 57 192 36 Z" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+{{ wheel(64, 96, 24, u) }}{{ wheel(170, 96, 24, u) }}
+{% elif kind == 'drill' %}
+{{ track(28, 96, 152) }}
+<rect x="40" y="88" width="128" height="9" fill="{{ FR }}"/>
+<rect x="34" y="60" width="132" height="29" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M86 66 V83 M94 66 V83 M102 66 V83 M110 66 V83" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="38" y="32" width="36" height="30" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="44" y="37" width="24" height="15" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M126 60 L155 30" stroke="#a3afbf" stroke-width="4" stroke-linecap="round"/>
+<path d="M159 117 V8" stroke="{{ O }}" stroke-width="2.5"/>
+<rect x="150" y="10" width="18" height="88" fill="none" stroke="{{ Y }}" stroke-width="4"/>
+<path d="M152 14 L166 26 L152 38 L166 50 L152 62 L166 74 L152 86 L166 96" fill="none" stroke="{{ SH }}" stroke-width="2"/>
+<rect x="145" y="4" width="28" height="9" rx="2" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5"/>
+{% elif kind == 'grader' %}
+{{ far_wheel(50, 101, 19) }}{{ far_wheel(94, 101, 19) }}{{ far_wheel(206, 101, 19) }}
+<path d="M112 70 L218 61 V73 L120 82 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="24" y="60" width="100" height="28" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M34 66 V82 M42 66 V82 M50 66 V82" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="100" y="26" width="36" height="38" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="106" y="31" width="24" height="18" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M150 77 L146 100 M168 75 L170 98" stroke="{{ FR }}" stroke-width="3"/>
+<path d="M126 100 L188 95 L190 104 L128 110 Z" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+{{ wheel(50, 101, 19, u) }}{{ wheel(94, 101, 19, u) }}{{ wheel(206, 101, 19, u) }}
+{% elif kind == 'tanker' %}
+{{ far_wheel(58, 100, 18) }}{{ far_wheel(98, 100, 18) }}{{ far_wheel(190, 100, 18) }}
+<rect x="26" y="84" width="190" height="8" rx="2" fill="{{ FR }}"/>
+<rect x="20" y="38" width="140" height="46" rx="23" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M58 40 V82 M96 40 V82 M134 40 V82" stroke="{{ SH }}" stroke-width="3"/>
+<rect x="76" y="31" width="20" height="8" rx="2" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.2"/>
+<path d="M166 46 H196 L212 66 L216 86 H166 Z" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M174 51 H194 L205 65 H174 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M16 92 V104 M12 104 H26" stroke="{{ O }}" stroke-width="2.5" stroke-linecap="round"/>
+{{ wheel(58, 100, 18, u) }}{{ wheel(98, 100, 18, u) }}{{ wheel(190, 100, 18, u) }}
+{% elif kind == 'locomotive' %}
+<path d="M2 117 H238" stroke="#8b95a5" stroke-width="3"/>
+<path d="M2 120.5 H238" stroke="#cbd2dc" stroke-width="1.5"/>
+<rect x="14" y="84" width="212" height="10" rx="2" fill="{{ FR }}"/>
+<rect x="8" y="86" width="8" height="6" rx="1" fill="{{ O }}"/><rect x="224" y="86" width="8" height="6" rx="1" fill="{{ O }}"/>
+<rect x="42" y="46" width="176" height="38" rx="4" fill="url(#{{ u }}r)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M62 52 V76 M72 52 V76 M82 52 V76 M92 52 V76 M102 52 V76 M112 52 V76 M122 52 V76 M132 52 V76 M142 52 V76" stroke="#8f2d18" stroke-width="3" stroke-linecap="round"/>
+<path d="M160 50 H212 V80 H160 Z" fill="none" stroke="#8f2d18" stroke-width="1.2"/>
+<rect x="18" y="30" width="34" height="54" rx="3" fill="url(#{{ u }}r)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="14" y="26" width="42" height="7" rx="2" fill="#7c2814" stroke="{{ O }}" stroke-width="1.2"/>
+<rect x="24" y="37" width="22" height="15" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="26" y="57" width="12" height="25" rx="1.5" fill="none" stroke="#7c2814" stroke-width="1.5"/>
+<path d="M14 80 H226" stroke="#f2b632" stroke-width="3.5"/>
+<rect x="150" y="40" width="10" height="7" rx="1" fill="{{ O }}"/>
+<rect x="24" y="96" width="70" height="8" rx="2" fill="{{ O }}"/><rect x="146" y="96" width="70" height="8" rx="2" fill="{{ O }}"/>
+{{ wheel(40, 106, 10, u) }}{{ wheel(78, 106, 10, u) }}{{ wheel(162, 106, 10, u) }}{{ wheel(200, 106, 10, u) }}
+{% else %}
+{{ far_wheel(66, 98, 20) }}{{ far_wheel(178, 98, 20) }}
+<path d="M22 64 H118 L130 42 H176 L198 64 L218 68 V92 H22 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M136 47 H152 V63 H128 Z M157 47 H174 L190 63 H157 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M22 80 H218" stroke="{{ SH }}" stroke-width="3"/>
+<path d="M34 64 V58 H108 V64" fill="none" stroke="{{ O }}" stroke-width="2"/>
+<rect x="208" y="72" width="10" height="6" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
+{{ wheel(66, 98, 20, u) }}{{ wheel(178, 98, 20, u) }}
+{% endif %}
+</svg>
+{%- endmacro %}
+
+{% macro sim_art(phone, operator='', iccid='', tone='blue', cls='') -%}
+{% set c1, c2 = {'blue': ('#3b82f6', '#1e40af'), 'green': ('#22c55e', '#15803d'), 'red': ('#f87171', '#b91c1c'), 'slate': ('#94a3b8', '#475569')}.get(tone, ('#3b82f6', '#1e40af')) %}
+{% set gid = 'simg' ~ (phone|string|replace(' ', '')|replace('+', '')|replace('-', '')|replace('(', '')|replace(')', '')) %}
+<svg class="{{ cls }}" viewBox="0 0 200 128" role="img" aria-label="SIM-карта {{ phone }}" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="{{ gid }}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{{ c1 }}"/><stop offset="1" stop-color="{{ c2 }}"/></linearGradient>
+<linearGradient id="{{ gid }}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6dd97"/><stop offset="1" stop-color="#c99a2e"/></linearGradient>
+</defs>
+<path d="M12 3 H166 L197 34 V116 Q197 125 188 125 H12 Q3 125 3 116 V12 Q3 3 12 3 Z" fill="url(#{{ gid }})"/>
+<path d="M12 3 H166 L197 34 V60 Q120 30 3 52 V12 Q3 3 12 3 Z" fill="#fff" opacity=".08"/>
+<rect x="18" y="40" width="46" height="36" rx="6" fill="url(#{{ gid }}c)" stroke="#a87d1c" stroke-width="1"/>
+<path d="M18 52 H33 V40 M18 64 H33 V76 M64 52 H49 V40 M64 64 H49 V76 M33 52 H49 V64 H33 Z" fill="none" stroke="#a87d1c" stroke-width="1"/>
+<text x="18" y="25" font-size="12" font-weight="600" fill="#fff" opacity=".92" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">{{ (operator or 'SIM')|truncate(20, true, '…') }}</text>
+<text x="18" y="102" font-size="17" font-weight="700" fill="#fff" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" style="font-variant-numeric: tabular-nums">{{ phone|truncate(18, true, '…') }}</text>
+{% if iccid %}<text x="18" y="117" font-size="9.5" fill="#fff" opacity=".75" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">ICCID ···{{ iccid[-6:] }}</text>{% endif %}
+</svg>
+{%- endmacro %}

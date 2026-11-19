@@ -3,6 +3,7 @@
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('sim_cards_list'), 'SIM-карты'), (none, sim_card.phone_number)]) }}{% endblock %}
 {% block content %}
 {% from "_card_kit.html" import icon, remove_btn, post_action, copy_val with context %}
+{% from "_machine_art.html" import machine_art, sim_art %}
 {% include "_card_styles.html" %}
 {% set s = sim_card %}
 {% set last = periods[0] if periods else none %}
@@ -23,12 +24,21 @@
 <div class="mc">
 {# ---------- Шапка ---------- #}
 <section class="mb-5 flex flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
+    <div class="hero min-w-0">
+        <div class="hero-sim">{{ sim_art(s.phone_number, s.operator, s.iccid, 'green' if current else {1: 'blue', 3: 'red'}.get(s.status_id, 'slate')) }}</div>
+        <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2 class="m-0 text-[24px] leading-tight font-semibold text-slate-900 tnum">{{ s.phone_number }}</h2>
             <span class="pill pill-{{ status_tone }}" title="{{ status_hints_sim.get(s.status_name, '') }}">{{ s.status_name }}</span>
         </div>
         <div class="mt-1 text-slate-500">{{ [s.operator, s.tariff]|select|join(' · ') or 'SIM-карта' }}</div>
+        {% if current %}
+        <a href="{{ url_for('machine_detail', machine_id=current.machine_id) }}" class="hero-on" title="Открыть карточку борта">
+            <span class="hero-on-art">{{ machine_art(current.type_name | machine_kind(current.model_name), title=current.type_name or '') }}</span>
+            <span class="min-w-0"><span class="hero-on-cap">стоит на борту</span><b class="tnum">{{ current.inventory_number }}</b>{% if current.model_name %} <span class="hero-on-cap">{{ current.model_name }}</span>{% endif %}</span>
+        </a>
+        {% endif %}
+        </div>
     </div>
     <div class="no-print flex flex-wrap items-center gap-2">
         {% if can_install %}

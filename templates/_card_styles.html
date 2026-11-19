@@ -27,6 +27,24 @@
     .pill-info { color: #1d4ed8; background: var(--blue-bg); border-color: #bfdbfe; }
     .pill-zero { color: var(--muted); background: #f8fafc; border-color: var(--line); }
 
+    /* ---- Шапка с рисунком (борт, SIM) ---- */
+    .hero { display: flex; align-items: flex-start; gap: 16px; }
+    .hero-art { flex: none; width: 168px; height: 92px; padding: 4px 6px; border-radius: var(--r-panel); border: 1px solid var(--line); background: linear-gradient(180deg, #f8fafc, #edf1f6); }
+    .hero-art svg, .hero-on-art svg { display: block; width: 100%; height: 100%; }
+    .hero-sim { flex: none; width: 132px; filter: drop-shadow(0 3px 8px rgb(15 23 42 / .15)); }
+    .hero-sim svg { display: block; width: 100%; height: auto; }
+    .hero-on { display: inline-flex; align-items: center; gap: 10px; margin-top: 8px; padding: 4px 12px 4px 4px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: #fff; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+    .hero-on:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgb(15 23 42 / .06); }
+    .hero-on-art { flex: none; width: 64px; height: 35px; border-radius: 6px; background: linear-gradient(180deg, #f8fafc, #edf1f6); }
+    .hero-on-cap { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.2; }
+    .hero-on b { font-size: 14px; }
+    @media (max-width: 480px) {
+        .hero { gap: 12px; }
+        .hero-art { width: 112px; height: 62px; padding: 2px 4px; }
+        .hero-sim { width: 92px; }
+    }
+    @media print { .hero-art, .hero-on-art { background: none; } }
+
     /* ---- Плитки ---- */
     .kpi { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: var(--r-panel); background: #fff; border: 1px solid var(--line); border-left-width: 4px; min-width: 0; }
     a.kpi { transition: box-shadow .15s, transform .15s; }
