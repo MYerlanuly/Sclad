@@ -27,6 +27,7 @@
 <linearGradient id="{{ u }}y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fad466"/><stop offset=".55" stop-color="#f2b632"/><stop offset="1" stop-color="#df9d18"/></linearGradient>
 <linearGradient id="{{ u }}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde08a"/><stop offset="1" stop-color="#efb53a"/></linearGradient>
 <linearGradient id="{{ u }}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf6fd"/><stop offset="1" stop-color="#a9cfe6"/></linearGradient>
+<linearGradient id="{{ u }}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d5dbe3"/></linearGradient>
 <linearGradient id="{{ u }}k" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a9a52"/><stop offset="1" stop-color="#5e6b31"/></linearGradient>
 <linearGradient id="{{ u }}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9583a"/><stop offset="1" stop-color="#a5361f"/></linearGradient>
 <radialGradient id="{{ u }}t" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#4a5566"/><stop offset="1" stop-color="#1c222b"/></radialGradient>
@@ -187,17 +188,33 @@
 <circle r="5" fill="#8d99aa" stroke="{{ O }}" stroke-width="1.2"/>
 </g>
 {% elif kind == 'bus' %}
-{{ far_wheel(56, 100, 15) }}{{ far_wheel(184, 100, 15) }}
-<path d="M18 46 Q18 36 28 36 H206 Q218 36 222 48 L226 72 V92 Q226 96 222 96 H22 Q18 96 18 92 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M20 74 H225" stroke="#b45309" stroke-width="3"/>
-<path d="M28 44 H52 V64 H28 Z M58 44 H82 V64 H58 Z M88 44 H112 V64 H88 Z M118 44 H142 V64 H118 Z M148 44 H172 V64 H148 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
-<rect x="178" y="44" width="16" height="44" rx="1.5" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
-<path d="M186 44 V88" stroke="{{ O }}" stroke-width="1"/>
-<path d="M200 44 H214 Q218 44 219 50 L222 66 H200 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
-<rect x="218" y="80" width="8" height="6" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
-<rect x="60" y="32" width="40" height="5" rx="2" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1"/>
-{{ wheel(56, 100, 15, u) }}{{ wheel(184, 100, 15, u) }}
+{{ far_wheel(58, 100, 16) }}{{ far_wheel(180, 100, 16) }}
+<path d="M14 44 Q14 34 24 34 H212 Q222 34 224 42 L228 86 Q228 96 220 96 H14 Z" fill="url(#{{ u }}w)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M30 36 H196" stroke="#cbd2dc" stroke-width="3" stroke-linecap="round"/>
+<path d="M24 42 H52 V70 H24 Z M56 42 H92 V70 H56 Z M116 42 H152 V70 H116 Z M156 42 H178 V70 H156 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M96 42 H112 V92 H96 Z M182 42 H200 V92 H182 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M104 42 V92 M191 42 V92" stroke="{{ O }}" stroke-width="1"/>
+<path d="M204 42 H220 L224 72 H204 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M14 78 H96 M112 78 H182 M200 78 H228" stroke="#94a3b8" stroke-width="1.5"/>
+<path d="M38 96 A20 20 0 0 1 78 96 M160 96 A20 20 0 0 1 200 96" fill="#2b3340"/>
+<rect x="221" y="80" width="7" height="5" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
+<rect x="222" y="88" width="8" height="6" rx="1.5" fill="#4b5563"/>
+<path d="M226 52 L232 50 V60 H228" fill="none" stroke="{{ O }}" stroke-width="1.5"/>
+{{ wheel(58, 100, 16, u) }}{{ wheel(180, 100, 16, u) }}
 {% elif kind == 'uaz' %}
+{{ far_wheel(66, 98, 17) }}{{ far_wheel(180, 98, 17) }}
+<path d="M18 48 Q18 30 36 30 H194 Q212 30 218 46 L224 66 Q228 78 226 88 Q225 94 218 94 H18 Z" fill="url(#{{ u }}w)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M30 33 H196" stroke="#cbd2dc" stroke-width="3" stroke-linecap="round"/>
+<path d="M66 40 Q66 37 69 37 H96 Q99 37 99 40 V58 H66 Z M104 40 Q104 37 107 37 H134 Q137 37 137 40 V58 H104 Z M146 40 Q146 37 149 37 H170 Q173 37 173 40 V58 H146 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M180 37 H200 Q208 37 212 46 L216 58 H180 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M176 34 V88 M140 34 V88" stroke="#94a3b8" stroke-width="1.2"/>
+<path d="M184 64 H192" stroke="{{ O }}" stroke-width="2" stroke-linecap="round"/>
+<path d="M46 94 A20 20 0 0 1 86 94 M160 94 A20 20 0 0 1 200 94" fill="#2b3340"/>
+<circle cx="222" cy="70" r="4" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
+<rect x="214" y="88" width="16" height="6" rx="2" fill="#2b3340"/>
+<circle cx="200" cy="34" r="2.5" fill="#f97316"/>
+{{ wheel(66, 98, 17, u) }}{{ wheel(180, 98, 17, u) }}
+{% elif kind == 'jeep' %}
 {{ far_wheel(64, 98, 19) }}{{ far_wheel(176, 98, 19) }}
 <path d="M30 54 H154 L160 58 H206 Q212 58 212 64 V88 H26 V58 Q26 54 30 54 Z" fill="url(#{{ u }}k)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
 <path d="M36 54 V34 Q36 30 40 30 H140 Q146 30 148 36 L152 54" fill="url(#{{ u }}k)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
@@ -208,14 +225,23 @@
 <rect x="204" y="70" width="10" height="7" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
 <path d="M26 88 H212" stroke="{{ O }}" stroke-width="3"/>
 {{ wheel(64, 98, 19, u) }}{{ wheel(176, 98, 19, u) }}
-{% else %}
+{% elif kind == 'pickup' %}
 {{ far_wheel(66, 98, 20) }}{{ far_wheel(178, 98, 20) }}
-<path d="M22 64 H118 L130 42 H176 L198 64 L218 68 V92 H22 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M22 64 H118 L130 42 H176 L198 64 L218 68 V92 H22 Z" fill="url(#{{ u }}w)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
 <path d="M136 47 H152 V63 H128 Z M157 47 H174 L190 63 H157 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
-<path d="M22 80 H218" stroke="{{ SH }}" stroke-width="3"/>
+<path d="M22 80 H218" stroke="#94a3b8" stroke-width="2"/>
 <path d="M34 64 V58 H108 V64" fill="none" stroke="{{ O }}" stroke-width="2"/>
 <rect x="208" y="72" width="10" height="6" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
 {{ wheel(66, 98, 20, u) }}{{ wheel(178, 98, 20, u) }}
+{% else %}
+{{ far_wheel(56, 100, 16) }}{{ far_wheel(190, 100, 16) }}
+<rect x="18" y="84" width="200" height="8" rx="2" fill="{{ FR }}"/>
+<rect x="14" y="34" width="134" height="52" rx="3" fill="url(#{{ u }}w)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M14 74 H148" stroke="#94a3b8" stroke-width="2"/>
+<path d="M154 44 H196 L214 64 L220 70 V90 H154 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M174 49 H194 L207 63 H174 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="212" y="76" width="8" height="6" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
+{{ wheel(56, 100, 16, u) }}{{ wheel(92, 100, 16, u) }}{{ wheel(190, 100, 16, u) }}
 {% endif %}
 </svg>
 {%- endmacro %}
