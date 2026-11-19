@@ -3,6 +3,7 @@
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('machines_list'), 'Техника'), (none, machine.inventory_number)]) }}{% endblock %}
 {% block content %}
 {% from "_card_kit.html" import icon, remove_btn, replace_link with context %}
+{% from "_machine_art.html" import machine_art %}
 
 {% macro wheel_tile(p) %}
 {% set s = p.sensor %}
@@ -29,8 +30,11 @@
 
 <div class="mc">
 {# ---------- Шапка ---------- #}
+{% set art_kind = machine.type_name | machine_kind(machine.model_name) %}
 <section class="mb-5 flex flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
+    <div class="hero min-w-0">
+        <div class="hero-art" title="{{ machine.type_name }} · {{ machine.model_name }}">{{ machine_art(art_kind, title=machine.type_name ~ ' ' ~ machine.model_name) }}</div>
+        <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2 class="m-0 text-[24px] leading-tight font-semibold text-slate-900 tnum">{{ machine.inventory_number }}</h2>
             <span class="pill pill-{{ to_level }}" title="Статус ТО">
@@ -41,6 +45,7 @@
             </span>
         </div>
         <div class="mt-1 text-slate-500">{{ machine.type_name }} · {{ machine.model_name }}</div>
+        </div>
     </div>
     <div class="no-print flex flex-wrap items-center gap-2">
         {% if can_work_shift %}
