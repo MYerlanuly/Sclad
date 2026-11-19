@@ -191,7 +191,7 @@ def register(app):
             fetch_all(
                 """
                 SELECT msc.id AS link_id, msc.machine_id, msc.installed_at, msc.removed_at, msc.removal_reason, msc.removal_comment,
-                       m.inventory_number, mm.name AS model_name, mt.name AS type_name
+                       m.inventory_number, mm.name AS model_name, mt.name AS type_name, mm.art_kind
                 FROM machine_sim_cards msc
                 JOIN machines m ON msc.machine_id = m.id
                 LEFT JOIN machine_models mm ON m.machine_model_id = mm.id

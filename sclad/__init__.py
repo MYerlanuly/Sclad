@@ -18,7 +18,7 @@ from . import config  # noqa: E402
 from . import auth, cli, context, views  # noqa: E402
 from .config import BASE_DIR, DATABASE  # noqa: E402
 from .db import close_db  # noqa: E402
-from .machine_art import KIND_LABELS, machine_kind, sim_palette  # noqa: E402
+from .machine_art import ART_CHOICES, KIND_LABELS, machine_kind, sim_palette  # noqa: E402
 from .migrations import run_migrations  # noqa: E402
 from .utils import _format_date_ddmmyy, _format_datetime_ddmmyy_hhmm  # noqa: E402
 
@@ -51,6 +51,7 @@ def create_app():
     app.jinja_env.filters["machine_kind"] = machine_kind
     app.jinja_env.globals["machine_kind_labels"] = KIND_LABELS
     app.jinja_env.globals["sim_palette"] = sim_palette
+    app.jinja_env.globals["art_choices"] = ART_CHOICES
     app.teardown_appcontext(close_db)
 
     auth.register(app)

@@ -4,6 +4,7 @@ import sqlite3
 from flask import flash, redirect, render_template, request, url_for
 
 from ..db import fetch_all, fetch_one, get_db, ref_id
+from ..machine_art import clean_art_kind
 
 
 def register(app):
@@ -206,8 +207,8 @@ def register(app):
             else:
                 db = get_db()
                 db.execute(
-                    "INSERT INTO machine_models (name, machine_type_id) VALUES (?, ?)",
-                    (name, machine_type_id),
+                    "INSERT INTO machine_models (name, machine_type_id, art_kind) VALUES (?, ?, ?)",
+                    (name, machine_type_id, clean_art_kind(request.form.get("art_kind"))),
                 )
                 db.commit()
                 flash("Модель техники добавлена.", "success")
@@ -217,7 +218,11 @@ def register(app):
     @app.route("/machine_models/<int:model_id>/edit", methods=["GET", "POST"])
     def machine_model_edit(model_id):
         types_ = fetch_all("SELECT * FROM machine_types ORDER BY id")
-        model = fetch_one("SELECT * FROM machine_models WHERE id = ?", (model_id,))
+        model = fetch_one(
+            "SELECT mm.*, mt.name AS type_name FROM machine_models mm "
+            "LEFT JOIN machine_types mt ON mm.machine_type_id = mt.id WHERE mm.id = ?",
+            (model_id,),
+        )
         if model is None:
             flash("Модель не найдена.", "error")
             return redirect(url_for("machine_models_list"))
@@ -229,8 +234,8 @@ def register(app):
             else:
                 db = get_db()
                 db.execute(
-                    "UPDATE machine_models SET name = ?, machine_type_id = ? WHERE id = ?",
-                    (name, machine_type_id, model_id),
+                    "UPDATE machine_models SET name = ?, machine_type_id = ?, art_kind = ? WHERE id = ?",
+                    (name, machine_type_id, clean_art_kind(request.form.get("art_kind")), model_id),
                 )
                 db.commit()
                 flash("Модель обновлена.", "success")

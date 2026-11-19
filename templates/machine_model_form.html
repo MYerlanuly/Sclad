@@ -6,6 +6,8 @@
 {% endif %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block content %}
+{% from "_machine_art.html" import machine_art %}
+{% set auto_kind = (model.type_name if model else none) | machine_kind(model.name if model else none) %}
 <div class="card">
     <div class="card-header">
         <div class="card-title">{{ page_title }}</div>
@@ -29,6 +31,36 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="field">
+            <label>Рисунок в карточке борта</label>
+            <div class="art-pick">
+                <label class="art-opt">
+                    <input type="radio" name="art_kind" value="" {% if not (model and model.art_kind) %}checked{% endif %}>
+                    <span class="art-img art-auto">{{ machine_art(auto_kind) }}</span>
+                    <span class="art-cap">Автоматически{% if model %}<br><span class="muted">сейчас: {{ machine_kind_labels[auto_kind] }}</span>{% else %}<br><span class="muted">по названию</span>{% endif %}</span>
+                </label>
+                {% for k, label in art_choices %}
+                <label class="art-opt">
+                    <input type="radio" name="art_kind" value="{{ k }}" {% if model and model.art_kind == k %}checked{% endif %}>
+                    <span class="art-img">{{ machine_art(k, title=label) }}</span>
+                    <span class="art-cap">{{ label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <p class="muted mt-1">«Автоматически» — рисунок подбирается по названию типа и модели. Если подобрался не тот, выберите нужный.</p>
+        </div>
+        <style>
+            .art-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+            .art-opt { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; cursor: pointer; font-weight: 400; }
+            .art-opt:hover { border-color: #93c5fd; }
+            .art-opt:has(input:checked) { border-color: #2563eb; box-shadow: 0 0 0 1px #2563eb; background: #eff6ff; }
+            .art-pick .art-opt input[type=radio] { position: absolute; top: 6px; left: 6px; width: 1px !important; min-width: 0; height: 1px; padding: 0; margin: 0; border: 0; opacity: 0; pointer-events: none; }
+            .art-img { display: block; height: 66px; border-radius: 6px; background: linear-gradient(180deg, #f8fafc, #edf1f6); }
+            .art-img svg { display: block; width: 100%; height: 100%; }
+            .art-auto { opacity: .8; }
+            .art-cap { font-size: 12.5px; line-height: 1.25; color: #334155; text-align: center; }
+            .art-opt:focus-within { outline: 2px solid #93c5fd; outline-offset: 1px; }
+        </style>
         <button type="submit" class="btn btn-primary">Сохранить</button>
         <a href="{{ url_for('machine_models_list') }}" class="btn btn-secondary">Отмена</a>
     </form>

@@ -34,7 +34,7 @@
         <div class="mt-1 text-slate-500">{{ [s.operator, s.tariff]|select|join(' · ') or 'SIM-карта' }}</div>
         {% if current %}
         <a href="{{ url_for('machine_detail', machine_id=current.machine_id) }}" class="hero-on" title="Открыть карточку борта">
-            <span class="hero-on-art">{{ machine_art(current.type_name | machine_kind(current.model_name), title=current.type_name or '') }}</span>
+            <span class="hero-on-art">{{ machine_art(current.type_name | machine_kind(current.model_name, current.art_kind), title=current.type_name or '') }}</span>
             <span class="min-w-0"><span class="hero-on-cap">стоит на борту</span><b class="tnum">{{ current.inventory_number }}</b>{% if current.model_name %} <span class="hero-on-cap">{{ current.model_name }}</span>{% endif %}</span>
         </a>
         {% endif %}
