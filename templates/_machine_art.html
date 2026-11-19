@@ -1,6 +1,6 @@
 {# Рисунки техники и SIM-карты — встроенные SVG (приложение работает без интернета).
-   machine_art(kind) — вид сбоку, kind из фильтра machine_kind: dump_truck, excavator, dozer, loader, drill, grader, tanker, locomotive, other.
-   sim_art(phone, operator, iccid, tone) — SIM-карта; tone: blue, green, red, slate. #}
+   machine_art(kind) — вид сбоку, kind из фильтра machine_kind (см. sclad/machine_art.py KINDS) или other.
+   sim_art(phone, operator, iccid, status_id) — SIM-карта в цвете оператора; списанная — серая. #}
 
 {% set Y = '#f2b632' %}{% set Y2 = '#f7c95a' %}{% set SH = '#d18f12' %}{% set O = '#3b4453' %}
 {% set T = '#262e3a' %}{% set G = '#cfe7f5' %}{% set FR = '#4a5566' %}
@@ -27,6 +27,7 @@
 <linearGradient id="{{ u }}y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fad466"/><stop offset=".55" stop-color="#f2b632"/><stop offset="1" stop-color="#df9d18"/></linearGradient>
 <linearGradient id="{{ u }}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde08a"/><stop offset="1" stop-color="#efb53a"/></linearGradient>
 <linearGradient id="{{ u }}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eaf6fd"/><stop offset="1" stop-color="#a9cfe6"/></linearGradient>
+<linearGradient id="{{ u }}k" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a9a52"/><stop offset="1" stop-color="#5e6b31"/></linearGradient>
 <linearGradient id="{{ u }}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9583a"/><stop offset="1" stop-color="#a5361f"/></linearGradient>
 <radialGradient id="{{ u }}t" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#4a5566"/><stop offset="1" stop-color="#1c222b"/></radialGradient>
 <radialGradient id="{{ u }}h" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#8d99aa"/></radialGradient>
@@ -129,6 +130,84 @@
 <rect x="150" y="40" width="10" height="7" rx="1" fill="{{ O }}"/>
 <rect x="24" y="96" width="70" height="8" rx="2" fill="{{ O }}"/><rect x="146" y="96" width="70" height="8" rx="2" fill="{{ O }}"/>
 {{ wheel(40, 106, 10, u) }}{{ wheel(78, 106, 10, u) }}{{ wheel(162, 106, 10, u) }}{{ wheel(200, 106, 10, u) }}
+{% elif kind == 'rope_shovel' %}
+{{ track(16, 96, 140, 24) }}
+<rect x="30" y="88" width="112" height="9" fill="{{ FR }}"/>
+<rect x="22" y="48" width="112" height="41" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M34 56 V82 M42 56 V82 M50 56 V82 M58 56 V82 M66 56 V82" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="18" y="44" width="120" height="6" rx="2" fill="#e6e9ee" stroke="{{ O }}" stroke-width="1.2"/>
+<path d="M62 45 L80 16 L96 45" fill="none" stroke="{{ SH }}" stroke-width="5" stroke-linejoin="round"/>
+<path d="M80 16 L206 10" stroke="{{ O }}" stroke-width="1.2"/>
+<rect x="110" y="24" width="28" height="22" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="116" y="28" width="17" height="11" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M124 76 L204 12" stroke="{{ O }}" stroke-width="13" stroke-linecap="round"/>
+<path d="M124 76 L204 12" stroke="{{ Y }}" stroke-width="10" stroke-linecap="round"/>
+<circle cx="205" cy="12" r="7" fill="#8d99aa" stroke="{{ O }}" stroke-width="1.5"/><circle cx="205" cy="12" r="2.5" fill="{{ O }}"/>
+<path d="M211 13 L216 70" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M140 66 L200 82" stroke="{{ O }}" stroke-width="9" stroke-linecap="round"/>
+<path d="M140 66 L200 82" stroke="{{ SH }}" stroke-width="6" stroke-linecap="round"/>
+<path d="M196 70 L232 70 L228 104 L200 100 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M200 70 V100" stroke="{{ SH }}" stroke-width="2"/>
+<path d="M203 101 L201 108 M211 102 L210 109 M219 103 L218 110 M226 104 L226 110" stroke="{{ O }}" stroke-width="2.5" stroke-linecap="round"/>
+{% elif kind == 'dragline' %}
+<ellipse cx="74" cy="108" rx="56" ry="9" fill="#2b3340"/>
+<rect x="14" y="94" width="30" height="20" rx="3" fill="{{ T }}"/><rect x="104" y="94" width="30" height="20" rx="3" fill="{{ T }}"/>
+<rect x="22" y="56" width="108" height="40" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M32 64 V88 M40 64 V88 M48 64 V88 M56 64 V88" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<rect x="18" y="52" width="116" height="6" rx="2" fill="#e6e9ee" stroke="{{ O }}" stroke-width="1.2"/>
+<rect x="106" y="34" width="26" height="20" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="111" y="38" width="16" height="10" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M70 53 L88 10 L100 53" fill="none" stroke="{{ SH }}" stroke-width="5" stroke-linejoin="round"/>
+<path d="M88 10 L232 6" stroke="{{ O }}" stroke-width="1.2"/>
+<path d="M118 78 L234 8 M126 84 L236 13" stroke="{{ Y }}" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M120 80 L130 76 L136 70 L146 66 L152 60 L162 56 L168 50 L178 46 L184 40 L194 36 L200 30 L210 26 L216 20 L226 16" fill="none" stroke="{{ SH }}" stroke-width="1.6"/>
+<circle cx="235" cy="10" r="4" fill="#8d99aa" stroke="{{ O }}" stroke-width="1.2"/>
+<path d="M235 14 L222 78 M140 78 L206 84" stroke="{{ O }}" stroke-width="1.3"/>
+<path d="M204 80 L234 80 L230 100 L208 100 Q200 90 204 80 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M210 101 L209 107 M217 101 L216 107 M224 101 L224 107" stroke="{{ O }}" stroke-width="2.2" stroke-linecap="round"/>
+{% elif kind == 'bucket_wheel' %}
+{{ track(60, 98, 110, 20) }}
+<rect x="70" y="80" width="90" height="18" rx="2" fill="{{ FR }}"/>
+<rect x="76" y="52" width="72" height="30" rx="3" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<path d="M86 58 V76 M94 58 V76 M102 58 V76" stroke="{{ SH }}" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M104 52 L110 8 L118 52" fill="none" stroke="{{ SH }}" stroke-width="4" stroke-linejoin="round"/>
+<path d="M110 8 L196 44 M110 8 L24 30" stroke="{{ O }}" stroke-width="1.2"/>
+<path d="M140 62 L190 52" stroke="{{ O }}" stroke-width="10" stroke-linecap="round"/>
+<path d="M140 62 L190 52" stroke="{{ Y }}" stroke-width="7" stroke-linecap="round"/>
+<path d="M84 56 L26 40" stroke="{{ O }}" stroke-width="8" stroke-linecap="round"/>
+<path d="M84 56 L26 40" stroke="{{ Y }}" stroke-width="5" stroke-linecap="round"/>
+<rect x="10" y="36" width="24" height="20" rx="2" fill="{{ FR }}" stroke="{{ O }}" stroke-width="1.2"/>
+<rect x="128" y="32" width="22" height="18" rx="3" fill="url(#{{ u }}c)" stroke="{{ O }}" stroke-width="1.5"/>
+<rect x="132" y="35" width="14" height="9" rx="2" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<g transform="translate(206 52)">
+{% for a in range(0, 360, 45) %}<path d="M-6 -30 L6 -30 L8 -22 L-8 -22 Z" transform="rotate({{ a }})" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1.2" stroke-linejoin="round"/>{% endfor %}
+<circle r="24" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5"/>
+<circle r="17" fill="none" stroke="{{ SH }}" stroke-width="2"/>
+{% for a in range(0, 180, 45) %}<path d="M-17 0 H17" transform="rotate({{ a }})" stroke="{{ SH }}" stroke-width="2"/>{% endfor %}
+<circle r="5" fill="#8d99aa" stroke="{{ O }}" stroke-width="1.2"/>
+</g>
+{% elif kind == 'bus' %}
+{{ far_wheel(56, 100, 15) }}{{ far_wheel(184, 100, 15) }}
+<path d="M18 46 Q18 36 28 36 H206 Q218 36 222 48 L226 72 V92 Q226 96 222 96 H22 Q18 96 18 92 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M20 74 H225" stroke="#b45309" stroke-width="3"/>
+<path d="M28 44 H52 V64 H28 Z M58 44 H82 V64 H58 Z M88 44 H112 V64 H88 Z M118 44 H142 V64 H118 Z M148 44 H172 V64 H148 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="178" y="44" width="16" height="44" rx="1.5" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M186 44 V88" stroke="{{ O }}" stroke-width="1"/>
+<path d="M200 44 H214 Q218 44 219 50 L222 66 H200 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<rect x="218" y="80" width="8" height="6" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
+<rect x="60" y="32" width="40" height="5" rx="2" fill="{{ SH }}" stroke="{{ O }}" stroke-width="1"/>
+{{ wheel(56, 100, 15, u) }}{{ wheel(184, 100, 15, u) }}
+{% elif kind == 'uaz' %}
+{{ far_wheel(64, 98, 19) }}{{ far_wheel(176, 98, 19) }}
+<path d="M30 54 H154 L160 58 H206 Q212 58 212 64 V88 H26 V58 Q26 54 30 54 Z" fill="url(#{{ u }}k)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M36 54 V34 Q36 30 40 30 H140 Q146 30 148 36 L152 54" fill="url(#{{ u }}k)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M44 36 H76 V52 H44 Z M82 36 H112 V52 H82 Z M118 36 H140 L145 52 H118 Z" fill="url(#{{ u }}g)" stroke="{{ O }}" stroke-width="1"/>
+<path d="M78 56 V86 M116 56 V86" stroke="#3f4a24" stroke-width="1.3"/>
+<path d="M120 64 H130" stroke="{{ O }}" stroke-width="2" stroke-linecap="round"/>
+<rect x="14" y="56" width="12" height="28" rx="5" fill="{{ T }}"/>
+<rect x="204" y="70" width="10" height="7" rx="1" fill="#fde68a" stroke="{{ O }}" stroke-width="1"/>
+<path d="M26 88 H212" stroke="{{ O }}" stroke-width="3"/>
+{{ wheel(64, 98, 19, u) }}{{ wheel(176, 98, 19, u) }}
 {% else %}
 {{ far_wheel(66, 98, 20) }}{{ far_wheel(178, 98, 20) }}
 <path d="M22 64 H118 L130 42 H176 L198 64 L218 68 V92 H22 Z" fill="url(#{{ u }}y)" stroke="{{ O }}" stroke-width="1.5" stroke-linejoin="round"/>
@@ -141,10 +220,10 @@
 </svg>
 {%- endmacro %}
 
-{% macro sim_art(phone, operator='', iccid='', tone='blue', cls='') -%}
-{% set c1, c2 = {'blue': ('#3b82f6', '#1e40af'), 'green': ('#22c55e', '#15803d'), 'red': ('#f87171', '#b91c1c'), 'slate': ('#94a3b8', '#475569')}.get(tone, ('#3b82f6', '#1e40af')) %}
-{% set gid = 'simg' ~ (phone|string|replace(' ', '')|replace('+', '')|replace('-', '')|replace('(', '')|replace(')', '')) %}
-<svg class="{{ cls }}" viewBox="0 0 200 128" role="img" aria-label="SIM-карта {{ phone }}" xmlns="http://www.w3.org/2000/svg">
+{% macro sim_art(phone, operator='', iccid='', status_id=1, cls='') -%}
+{% set c1, c2, ink = sim_palette(operator) %}
+{% set gid = 'simg' ~ range(1000000)|random %}
+<svg class="{{ cls }}" viewBox="0 0 200 128" role="img" aria-label="SIM-карта {{ phone }}"{% if status_id == 4 %} style="filter: grayscale(1); opacity: .7"{% endif %} xmlns="http://www.w3.org/2000/svg">
 <defs>
 <linearGradient id="{{ gid }}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{{ c1 }}"/><stop offset="1" stop-color="{{ c2 }}"/></linearGradient>
 <linearGradient id="{{ gid }}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6dd97"/><stop offset="1" stop-color="#c99a2e"/></linearGradient>
@@ -153,8 +232,8 @@
 <path d="M12 3 H166 L197 34 V60 Q120 30 3 52 V12 Q3 3 12 3 Z" fill="#fff" opacity=".08"/>
 <rect x="18" y="40" width="46" height="36" rx="6" fill="url(#{{ gid }}c)" stroke="#a87d1c" stroke-width="1"/>
 <path d="M18 52 H33 V40 M18 64 H33 V76 M64 52 H49 V40 M64 64 H49 V76 M33 52 H49 V64 H33 Z" fill="none" stroke="#a87d1c" stroke-width="1"/>
-<text x="18" y="25" font-size="12" font-weight="600" fill="#fff" opacity=".92" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">{{ (operator or 'SIM')|truncate(20, true, '…') }}</text>
-<text x="18" y="102" font-size="17" font-weight="700" fill="#fff" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" style="font-variant-numeric: tabular-nums">{{ phone|truncate(18, true, '…') }}</text>
-{% if iccid %}<text x="18" y="117" font-size="9.5" fill="#fff" opacity=".75" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">ICCID ···{{ iccid[-6:] }}</text>{% endif %}
+<text x="18" y="25" font-size="12" font-weight="600" fill="{{ ink }}" opacity=".92" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">{{ (operator or 'SIM')|truncate(20, true, '…') }}</text>
+<text x="18" y="102" font-size="17" font-weight="700" fill="{{ ink }}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" style="font-variant-numeric: tabular-nums">{{ phone|truncate(18, true, '…') }}</text>
+{% if iccid %}<text x="18" y="117" font-size="9.5" fill="{{ ink }}" opacity=".75" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">ICCID ···{{ iccid[-6:] }}</text>{% endif %}
 </svg>
 {%- endmacro %}

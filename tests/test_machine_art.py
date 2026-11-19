@@ -9,8 +9,16 @@ from sclad.machine_art import machine_kind
     ("Самосвал", "БелАЗ-75131", "dump_truck"),
     ("Карьерный самосвал", None, "dump_truck"),
     ("Техника", "БелАЗ-7555", "dump_truck"),
-    ("Экскаватор", "ЭКГ-10", "excavator"),
-    ("", "ЭКГ-5А", "excavator"),
+    ("Экскаватор", "ЭКГ-10", "rope_shovel"),
+    ("", "ЭКГ-5А", "rope_shovel"),
+    ("Экскаватор", "Hitachi EX1200", "excavator"),
+    ("Экскаватор", "ЭШ-10/70", "dragline"),
+    ("Шагающий экскаватор", None, "dragline"),
+    ("Роторный экскаватор", "ЭРП-1250", "bucket_wheel"),
+    ("Автобус", "ПАЗ-32053", "bus"),
+    ("Транспорт", "ПАЗ-4234", "bus"),
+    ("Легковой", "УАЗ-469", "uaz"),
+    ("Смешанный транспорт", "Камаз", "other"),
     ("Бульдозер", "Б-10М", "dozer"),
     ("Фронтальный погрузчик", "", "loader"),
     ("Буровой станок", "СБШ-250", "drill"),
@@ -19,7 +27,7 @@ from sclad.machine_art import machine_kind
     ("Топливозаправщик", None, "tanker"),
     ("Тепловоз", "ТЭМ-7А", "locomotive"),
     ("Тяговый агрегат", "НП-1", "locomotive"),
-    ("Автобус", "ПАЗ", "other"),
+    ("Кран", "КС-45717", "other"),
     (None, None, "other"),
 ])
 def test_machine_kind(type_name, model, kind):
@@ -36,7 +44,7 @@ def test_machine_card_drawing_for_other_type(admin, seed):
     m = db_exec("INSERT INTO machine_models (name, machine_type_id) VALUES ('ЭКГ-10', ?)", (t,))
     mid = db_exec("INSERT INTO machines (inventory_number, machine_model_id) VALUES ('Э-1', ?)", (m,))
     html = admin.get(f"/machines/{mid}").get_data(as_text=True)
-    assert 'data-kind="excavator"' in html
+    assert 'data-kind="rope_shovel"' in html
 
 
 def test_sim_card_on_stock_drawing(admin, seed):
@@ -51,7 +59,21 @@ def test_sim_card_installed_shows_machine(admin, seed):
     db_exec("UPDATE sim_cards SET status_id = 2 WHERE id = ?", (seed["sim"],))
     html = admin.get(f"/sim_cards/{seed['sim']}").get_data(as_text=True)
     assert "стоит на борту" in html and "INV-001" in html and 'data-kind="dump_truck"' in html
-    assert "#22c55e" in html            # стоит на борту — зелёная
+
+
+@pytest.mark.parametrize("operator, color", [
+    ("Beeline", "#ffd84d"), ("Билайн", "#ffd84d"), ("Kcell", "#9b5de5"), ("Activ", "#9b5de5"), ("Tele2", "#4b5563"), ("", "#3b82f6"),
+])
+def test_sim_color_by_operator(admin, seed, operator, color):
+    db_exec("UPDATE sim_cards SET operator = ? WHERE id = ?", (operator, seed["sim"]))
+    html = admin.get(f"/sim_cards/{seed['sim']}").get_data(as_text=True)
+    assert color in html
+
+
+def test_sim_written_off_is_grey(admin, seed):
+    db_exec("UPDATE sim_cards SET status_id = 4 WHERE id = ?", (seed["sim"],))
+    html = admin.get(f"/sim_cards/{seed['sim']}").get_data(as_text=True)
+    assert "grayscale(1)" in html
 
 
 def test_sim_operator_is_escaped(admin, seed):

@@ -25,7 +25,7 @@
 {# ---------- Шапка ---------- #}
 <section class="mb-5 flex flex-wrap items-start justify-between gap-3">
     <div class="hero min-w-0">
-        <div class="hero-sim">{{ sim_art(s.phone_number, s.operator, s.iccid, 'green' if current else {1: 'blue', 3: 'red'}.get(s.status_id, 'slate')) }}</div>
+        <div class="hero-sim">{{ sim_art(s.phone_number, s.operator, s.iccid, s.status_id) }}</div>
         <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2 class="m-0 text-[24px] leading-tight font-semibold text-slate-900 tnum">{{ s.phone_number }}</h2>
