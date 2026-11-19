@@ -1,6 +1,8 @@
 """Данные, доступные во всех шаблонах."""
 from flask import current_app, session, url_for
 
+from .removal import EQUIPMENT_REMOVAL_REASONS, SIM_REMOVAL_REASONS
+
 
 def register(app):
     @app.context_processor
@@ -33,6 +35,8 @@ def register(app):
             "recent_items": list(reversed(recent_items)),  # новые сверху
             "sclad_name": current_app.config.get("SCLAD_NAME", "Склад АСДУ"),
             "sclad_instance": current_app.config.get("SCLAD_INSTANCE", ""),
+            # Причины демонтажа для окна «Снять» в карточках
+            "removal_reasons": {"equipment": EQUIPMENT_REMOVAL_REASONS, "sim": SIM_REMOVAL_REASONS},
         }
 
     # ===== Simple helpers for lookups =====

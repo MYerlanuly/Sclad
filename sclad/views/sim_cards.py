@@ -190,7 +190,7 @@ def register(app):
         periods = install_periods(
             fetch_all(
                 """
-                SELECT msc.id AS link_id, msc.machine_id, msc.installed_at, msc.removed_at,
+                SELECT msc.id AS link_id, msc.machine_id, msc.installed_at, msc.removed_at, msc.removal_reason, msc.removal_comment,
                        m.inventory_number, mm.name AS model_name, mt.name AS type_name
                 FROM machine_sim_cards msc
                 JOIN machines m ON msc.machine_id = m.id
@@ -200,7 +200,8 @@ def register(app):
                 ORDER BY msc.installed_at DESC, msc.id DESC
                 """,
                 (sim_id,),
-            )
+            ),
+            kind="sim",
         )
         can_edit = getattr(current_user, "can_edit", False)
         return render_template(

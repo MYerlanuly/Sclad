@@ -71,6 +71,9 @@
     /* Демонтаж — неброская кнопка, краснеет при наведении */
     .row-del { display: inline-flex; align-items: center; justify-content: center; height: 24px; padding: 0 7px; border-radius: 6px; border: 1px solid transparent; background: none; color: var(--faint); font-size: 12px; cursor: pointer; }
     .row-del:hover { color: var(--red); border-color: var(--red-line); background: var(--red-bg); }
+    a.row-del { text-decoration: none; }
+    .row-swap:hover { color: var(--blue); border-color: #bfdbfe; background: #eff6ff; }
+    .row-acts { display: inline-flex; align-items: center; gap: 2px; flex: none; }
 
     /* Позиции колёс */
     .wheels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 16px; }
@@ -83,7 +86,10 @@
     .wheel-on .wheel-code::before { background: var(--green); }
     .wheel-pos { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .wheel-val { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .wheel .row-del { position: absolute; top: 5px; right: 5px; height: 22px; }
+    .wheel .row-acts { position: absolute; top: 5px; right: 5px; }
+    .wheel .row-del { height: 22px; }
+    /* Узкие плитки на телефоне: кнопки под номером, а не поверх кода позиции */
+    @media (max-width: 639px) { .wheel .row-acts { position: static; order: 9; margin: 4px 0 0 -7px; } }
     .axle { padding: 10px 16px 0; }
     .axle-cap { font-size: 11.5px; color: var(--faint); margin-bottom: 6px; }
     .axle-front, .axle-rear { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

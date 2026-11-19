@@ -6,6 +6,7 @@ from flask_login import current_user
 
 from .. import shift_journal as sj
 from ..db import fetch_all, fetch_one, get_setting
+from ..stock import shortages
 from ..utils import _format_backup_date, fix_mojibake_text
 from .maintenance import MAINTENANCE_STATUS_CTE
 
@@ -205,6 +206,7 @@ def register(app):
             open_past=open_past,
             journal=_journal_summary(cur_shift, cur_date),
             recent_ops=_recent_operations(),
+            stock_short=shortages(),
             can_edit=getattr(current_user, "can_edit", False),
             can_work_shift=role in ("admin", "editor", "maintenance"),
             last_backup_at=_format_backup_date(get_setting("last_backup_at", "")),

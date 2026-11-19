@@ -2,7 +2,7 @@
 {% block title %}Борт {{ machine.inventory_number }}{% endblock %}
 {% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('machines_list'), 'Техника'), (none, machine.inventory_number)]) }}{% endblock %}
 {% block content %}
-{% from "_card_kit.html" import icon, remove_btn with context %}
+{% from "_card_kit.html" import icon, remove_btn, replace_link with context %}
 
 {% macro wheel_tile(p) %}
 {% set s = p.sensor %}
@@ -11,7 +11,7 @@
     <span class="wheel-pos" title="{{ p.label or p.code }}">{{ p.label or p.code }}</span>
     {% if s %}
     <span class="wheel-val"><a href="{{ url_for('equipment_detail', equipment_id=s.id) }}" class="lnk tnum" title="{{ s.name }}, установлен {{ s.installed_at | datefmt }}">{{ s.serial_number }}</a></span>
-    {% if can_edit %}{{ remove_btn(url_for('remove_equipment', machine_id=machine.id, link_id=s.link_id), 'датчик ' ~ s.serial_number ~ ' с позиции ' ~ p.code) }}{% endif %}
+    {% if can_edit %}<span class="row-acts">{{ replace_link(machine.id, s.link_id, 'датчик ' ~ s.serial_number) }}{{ remove_btn(url_for('remove_equipment', machine_id=machine.id, link_id=s.link_id), 'датчик ' ~ s.serial_number ~ ' с позиции ' ~ p.code) }}</span>{% endif %}
     {% elif can_edit %}
     <span class="wheel-val"><a href="{{ url_for('install_equipment', machine_id=machine.id, position=p.id) }}" class="lnk no-print">+ Установить</a></span>
     {% else %}
@@ -149,7 +149,7 @@
                         <div class="meta tnum">{{ e.serial_number }}</div>
                     </div>
                     <span class="meta tnum shrink-0" title="Дата установки">с {{ e.installed_at | datefmt }}</span>
-                    {% if can_edit %}{{ remove_btn(url_for('remove_equipment', machine_id=machine.id, link_id=e.link_id), '«' ~ e.name ~ '» ' ~ e.serial_number) }}{% endif %}
+                    {% if can_edit %}<span class="row-acts">{{ replace_link(machine.id, e.link_id, '«' ~ e.name ~ '» ' ~ e.serial_number) }}{{ remove_btn(url_for('remove_equipment', machine_id=machine.id, link_id=e.link_id), '«' ~ e.name ~ '» ' ~ e.serial_number) }}</span>{% endif %}
                 </li>
                 {% endfor %}
             </ul>
@@ -168,7 +168,7 @@
                         {% if active_sim.description %}<div class="meta">{{ active_sim.description }}</div>{% endif %}
                     </div>
                     <span class="meta tnum shrink-0" title="Дата установки">с {{ active_sim.installed_at | datefmt }}</span>
-                    {% if can_edit %}{{ remove_btn(url_for('remove_sim', machine_id=machine.id, link_id=active_sim.link_id), 'SIM-карту ' ~ active_sim.phone_number) }}{% endif %}
+                    {% if can_edit %}{{ remove_btn(url_for('remove_sim', machine_id=machine.id, link_id=active_sim.link_id), 'SIM-карту ' ~ active_sim.phone_number, kind='sim') }}{% endif %}
                 </li>
             </ul>
             {% else %}
@@ -263,6 +263,7 @@
                         {% if h.kind == 'sim' %}<a href="{{ url_for('sim_card_detail', sim_id=h.item_id) }}" class="lnk">{{ h.label }}</a>
                         {% else %}<a href="{{ url_for('equipment_detail', equipment_id=h.item_id) }}" class="lnk">{{ h.label }}</a>{% endif %}
                         {% if h.detail %}<span class="meta tnum">{{ h.detail }}</span>{% endif %}
+                        {% if h.reason %}<span class="meta" title="Причина снятия">· {{ h.reason }}</span>{% endif %}
                     </div>
                 </li>
             {% endmacro %}

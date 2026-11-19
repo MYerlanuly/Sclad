@@ -252,11 +252,12 @@
             <nav>
                 <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Главная</a>
                 <details class="nav-drop">
-                    <summary class="nav-drop-trigger {% if request.endpoint and (request.endpoint.startswith('equipment_') or request.endpoint.startswith('machine') or request.endpoint.startswith('sim_card') or request.endpoint == 'import_page' or request.endpoint.startswith('import_')) %}active{% endif %}">Склад</summary>
+                    <summary class="nav-drop-trigger {% if request.endpoint and (request.endpoint.startswith('equipment_') or request.endpoint.startswith('machine') or request.endpoint.startswith('sim_card') or request.endpoint == 'stock_minimums' or request.endpoint == 'import_page' or request.endpoint.startswith('import_')) %}active{% endif %}">Склад</summary>
                     <div class="nav-dropdown">
                         <a href="{{ url_for('equipment_list') }}" class="{% if request.endpoint and request.endpoint.startswith('equipment_') %}active{% endif %}">Оборудование</a>
                         <a href="{{ url_for('machines_list') }}" class="{% if request.endpoint and request.endpoint.startswith('machine') %}active{% endif %}">Техника</a>
                         <a href="{{ url_for('sim_cards_list') }}" class="{% if request.endpoint and request.endpoint.startswith('sim_card') %}active{% endif %}">SIM-карты</a>
+                        <a href="{{ url_for('stock_minimums') }}" class="{% if request.endpoint == 'stock_minimums' %}active{% endif %}">Остатки и минимумы</a>
                         <a href="{{ url_for('import_page') }}" class="{% if request.endpoint == 'import_page' or request.endpoint.startswith('import_') %}active{% endif %}">Массовый ввод</a>
                     </div>
                 </details>

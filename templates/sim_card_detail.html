@@ -14,9 +14,9 @@
     <div class="flex-1 min-w-0">
         <div class="truncate"><a href="{{ url_for('machine_detail', machine_id=p.machine_id) }}" class="lnk tnum">{{ p.inventory_number }}</a>
             <span class="meta">{{ [p.type_name, p.model_name]|select|join(' · ') }}</span></div>
-        <div class="meta tnum">{% if p.active %}с {{ p.installed_at | datefmt }} · <span class="text-green-700 font-medium">стоит сейчас</span>{% else %}{{ p.installed_at | datefmt }} — {{ p.removed_at | datefmt }}{% endif %}{% if p.days is not none %} · {{ p.days }} дн.{% endif %}</div>
+        <div class="meta tnum">{% if p.active %}с {{ p.installed_at | datefmt }} · <span class="text-green-700 font-medium">стоит сейчас</span>{% else %}{{ p.installed_at | datefmt }} — {{ p.removed_at | datefmt }}{% if p.reason %} · <span class="text-slate-600" title="Причина снятия">{{ p.reason }}</span>{% endif %}{% endif %}{% if p.days is not none %} · {{ p.days }} дн.{% endif %}</div>
     </div>
-    {% if p.active and can_edit %}{{ remove_btn(url_for('remove_sim', machine_id=p.machine_id, link_id=p.link_id), 'SIM-карту ' ~ s.phone_number, question='Снять SIM ' ~ s.phone_number ~ ' с борта ' ~ p.inventory_number ~ '? Она вернётся на склад.', back='card') }}{% endif %}
+    {% if p.active and can_edit %}{{ remove_btn(url_for('remove_sim', machine_id=p.machine_id, link_id=p.link_id), 'SIM-карту ' ~ s.phone_number, question='Снять SIM ' ~ s.phone_number ~ ' с борта ' ~ p.inventory_number ~ '?', back='card', kind='sim') }}{% endif %}
 </li>
 {% endmacro %}
 

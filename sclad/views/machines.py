@@ -7,6 +7,7 @@ from flask import flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
 
 from ..db import fetch_all, fetch_one, get_db, ref_id
+from ..removal import reason_text
 from ..utils import to_int
 
 MAINTENANCE_RECENT_LIMIT = 5
@@ -121,7 +122,8 @@ def _machine_card_context(machine_id):
     history = []
     for row in fetch_all(
         """
-        SELECT me.installed_at, me.removed_at, e.id AS item_id, e.name, e.serial_number, sp.code AS position_code
+        SELECT me.installed_at, me.removed_at, me.removal_reason, me.removal_comment,
+               e.id AS item_id, e.name, e.serial_number, sp.code AS position_code
         FROM machine_equipment me
         JOIN equipment e ON me.equipment_id = e.id
         LEFT JOIN sensor_positions sp ON me.sensor_position_id = sp.id
@@ -137,10 +139,11 @@ def _machine_card_context(machine_id):
         }
         history.append(dict(item, action="install", at=row["installed_at"]))
         if row["removed_at"]:
-            history.append(dict(item, action="remove", at=row["removed_at"]))
+            history.append(dict(item, action="remove", at=row["removed_at"],
+                                reason=reason_text("equipment", row["removal_reason"], row["removal_comment"])))
     for row in fetch_all(
         """
-        SELECT msc.installed_at, msc.removed_at, sc.id AS item_id, sc.phone_number, sc.iccid
+        SELECT msc.installed_at, msc.removed_at, msc.removal_reason, msc.removal_comment, sc.id AS item_id, sc.phone_number, sc.iccid
         FROM machine_sim_cards msc
         JOIN sim_cards sc ON msc.sim_card_id = sc.id
         WHERE msc.machine_id = ?
@@ -150,7 +153,8 @@ def _machine_card_context(machine_id):
         item = {"kind": "sim", "item_id": row["item_id"], "label": "SIM " + (row["phone_number"] or ""), "detail": row["iccid"] or ""}
         history.append(dict(item, action="install", at=row["installed_at"]))
         if row["removed_at"]:
-            history.append(dict(item, action="remove", at=row["removed_at"]))
+            history.append(dict(item, action="remove", at=row["removed_at"],
+                                reason=reason_text("sim", row["removal_reason"], row["removal_comment"])))
     history.sort(key=lambda h: (str(h["at"] or ""), h["action"] == "install"), reverse=True)
 
     return {
