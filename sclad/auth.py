@@ -127,6 +127,7 @@ def register(app):
                     "replace_equipment",
                     # Журнал смены
                     "journal_entry_add",
+                    "journal_drafts_add",
                     "journal_entry_edit",
                     "journal_entry_delete",
                     "journal_engineer_add",
