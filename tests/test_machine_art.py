@@ -68,7 +68,7 @@ def test_sim_card_installed_shows_machine(admin, seed):
 
 
 @pytest.mark.parametrize("operator, color", [
-    ("Beeline", "#ffd84d"), ("Билайн", "#ffd84d"), ("Kcell", "#9b5de5"), ("Activ", "#9b5de5"), ("Tele2", "#4b5563"), ("", "#3b82f6"),
+    ("Beeline", "#ffd84d"), ("Билайн", "#ffd84d"), ("Kcell", "#9b5de5"), ("Activ", "#f04438"), ("АКТИВ", "#f04438"), ("Tele2", "#4b5563"), ("", "#3b82f6"),
 ])
 def test_sim_color_by_operator(admin, seed, operator, color):
     db_exec("UPDATE sim_cards SET operator = ? WHERE id = ?", (operator, seed["sim"]))
