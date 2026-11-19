@@ -846,6 +846,25 @@ def migrate_removal_reasons_and_stock_minimums():
         conn.close()
 
 
+def migrate_journal_entries_source_key():
+    """Запись журнала смены, добавленная из черновика «Выполнено за смену»: откуда она (task-12, rep-34...)."""
+    if not os.path.exists(DATABASE):
+        return False
+    conn = sqlite3.connect(DATABASE)
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(journal_entries)").fetchall()]
+        if cols and "source_key" not in cols:
+            try:
+                conn.execute("ALTER TABLE journal_entries ADD COLUMN source_key TEXT")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 MIGRATIONS = (
     migrate_equipment_unique_constraint,
     migrate_sensor_positions_group,
@@ -870,6 +889,7 @@ MIGRATIONS = (
     migrate_shift_journal,
     migrate_shift_tasks_carry_over,
     migrate_removal_reasons_and_stock_minimums,
+    migrate_journal_entries_source_key,
 )
 
 

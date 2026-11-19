@@ -11,6 +11,29 @@
     .journal-engineers-box { border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem; }
     .journal-entry-fields .field { margin-bottom: 0.75rem; }
     .journal-main .table-wrap { overflow-x: auto; }
+    .jd { border: 1px solid #bfdbfe; background: #f8fbff; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; }
+    .jd > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .jd > summary::-webkit-details-marker { display: none; }
+    .jd > summary::before { content: "▸"; color: #2563eb; font-size: 0.75rem; }
+    .jd[open] > summary::before { content: "▾"; }
+    .jd-title { font-weight: 600; color: #1e293b; }
+    .jd-count { font-size: 0.8125rem; color: #2563eb; }
+    .jd-lead { font-size: 0.8125rem; color: #64748b; margin: 0.375rem 0 0.625rem; }
+    .jd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+    .jd-list li { display: flex; align-items: flex-start; gap: 0.5rem; }
+    .jd-check { padding-top: 0.45rem; }
+    .jd-check input { width: 16px; height: 16px; accent-color: #2563eb; }
+    .jd-time { flex: none; width: 3rem; padding-top: 0.35rem; font-size: 0.875rem; font-variant-numeric: tabular-nums; color: #475569; }
+    .jd-time-input { flex: none; width: 4.25rem; padding: 0.35rem 0.4rem; font-size: 0.875rem; font-variant-numeric: tabular-nums; text-align: center; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: #fff; }
+    .jd-time-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgb(37 99 235 / .2); }
+    .jd-fields { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+    @media (min-width: 900px) { .jd-fields { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
+    .jd-fields input { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.875rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: #fff; box-sizing: border-box; }
+    .jd-fields input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgb(37 99 235 / .2); }
+    .jd-done { opacity: 0.6; }
+    .jd-text { flex: 1; padding-top: 0.35rem; font-size: 0.875rem; color: #334155; }
+    .jd-note { color: #64748b; }
+    .jd-in { margin-left: 0.25rem; font-size: 0.75rem; color: #15803d; }
     @media print { .journal-layout { display: block; } .journal-side { position: static; } }
 </style>
 <div class="card">
@@ -115,6 +138,37 @@
         </div>
     </aside>
     <section class="journal-main">
+        {% set new_drafts = drafts|rejectattr('already')|list %}
+        {% if drafts %}
+        <details class="jd no-print" {% if new_drafts %}open{% endif %}>
+            <summary><span class="jd-title">Выполнено за смену</span>
+                <span class="jd-count">{% if new_drafts %}{{ new_drafts|length }} не в журнале{% else %}всё уже в журнале{% endif %}</span></summary>
+            <p class="jd-lead">Собрано из заданий, установок, замен и ТО за эту смену. Отметьте нужное, поправьте текст и добавьте в журнал.</p>
+            <form method="post" action="{{ url_for('journal_drafts_add') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="date" value="{{ shift_date }}">
+                <input type="hidden" name="shift" value="{{ shift }}">
+                <ul class="jd-list">
+                {% for d in drafts %}
+                    <li class="{{ 'jd-done' if d.already }}">
+                        <label class="jd-check"><input type="checkbox" name="pick" value="{{ d.key }}" {% if d.already %}disabled{% else %}checked{% endif %} aria-label="Добавить: {{ d.content }}"></label>
+                        {% if d.already %}
+                        <span class="jd-time">{{ d.time }}</span>
+                        <span class="jd-text">{{ d.content }}{% if d.note %} <span class="jd-note">· {{ d.note }}</span>{% endif %} <span class="jd-in">уже в журнале</span></span>
+                        {% else %}
+                        <input type="text" name="time__{{ d.key }}" value="{{ d.time }}" class="jd-time-input" required pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" inputmode="numeric" aria-label="Время">
+                        <span class="jd-fields">
+                            <input type="text" name="content__{{ d.key }}" value="{{ d.content }}" aria-label="Содержание">
+                            <input type="text" name="note__{{ d.key }}" value="{{ d.note }}" placeholder="Примечание" aria-label="Примечание" class="jd-note-input">
+                        </span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+                {% if new_drafts %}<button type="submit" class="btn btn-primary mt-3">Добавить отмеченное в журнал</button>{% endif %}
+            </form>
+        </details>
+        {% endif %}
         <h3 class="text-base font-semibold text-slate-800 mb-2">Записи журнала</h3>
         <div class="table-wrap">
         <table id="journal-entries">

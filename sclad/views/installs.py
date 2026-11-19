@@ -3,6 +3,7 @@ import sqlite3
 from datetime import datetime
 
 from flask import flash, redirect, render_template, request, url_for
+from flask_login import current_user
 
 from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
 from ..removal import EQUIPMENT_REMOVAL_REASONS, parse_removal, reason_text
@@ -239,8 +240,13 @@ def register(app):
         # ?task=<id> — замена из задания на смену: после замены задание отметится выполненным
         task_id = to_int(request.values.get("task"))
         task = fetch_one(
-            "SELECT id, status, title FROM shift_tasks WHERE id = ? AND status <> 'not_done'", (task_id,)
+            "SELECT id, status, title, machine_id FROM shift_tasks WHERE id = ? AND status <> 'not_done'", (task_id,)
         ) if task_id else None
+        # Роль maintenance (инженеры смены) меняет оборудование только по заданию на этот борт
+        if not getattr(current_user, "can_edit", False):
+            if not (getattr(current_user, "role", None) == "maintenance" and task and task["machine_id"] == machine_id):
+                flash("Заменять оборудование можно только из задания на смену по этому борту.", "error")
+                return redirect(url_for("machine_detail", machine_id=machine_id))
         if request.method == "POST":
             new_id = to_int(request.form.get("equipment_id"))
             reason, comment, status_id = parse_removal(request.form, "equipment")

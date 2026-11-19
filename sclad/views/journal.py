@@ -6,6 +6,7 @@ from flask import Response, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from .. import shift_journal as sj
+from ..journal_drafts import collect_drafts
 from ..auth import require_admin
 from ..db import fetch_all, fetch_one, get_db, get_setting, log_operation, set_setting
 from ..utils import to_int
@@ -74,6 +75,7 @@ def register(app):
             users=users,
             now_time=sj.now().strftime("%H:%M"),
             mail_html=sj.mail_html(shift, shift_date, engineers, entries),
+            drafts=collect_drafts(shift, shift_date, entries) if editable else [],
             mail_to=get_setting("journal_mail_to", ""),
             mail_cc=get_setting("journal_mail_cc", ""),
         )
@@ -104,6 +106,45 @@ def register(app):
             db.commit()
             log_operation("create", "journal_entry", cur.lastrowid, f"Журнал смены {sj.title_for(shift, shift_date)}, {entry_time}: {content[:200]}")
             flash("Запись добавлена.", "success")
+        return _back(shift, shift_date)
+
+    @app.route("/journal/drafts/add", methods=["POST"])
+    def journal_drafts_add():
+        """Добавить в журнал отмеченные строки черновика «Выполнено за смену»."""
+        shift, shift_date = _check_current_shift()
+        if shift is None:
+            return redirect(url_for("journal"))
+        if sj.parse_date(request.form.get("date")) not in (None, shift_date) or sj.parse_shift(request.form.get("shift")) not in (None, shift):
+            flash("Смена уже сменилась. Страница обновлена на текущую смену.", "error")
+            return _back(shift, shift_date)
+        _, entries = sj.load_shift(get_db(), shift, shift_date)
+        picked = set(request.form.getlist("pick"))
+        db = get_db()
+        added = skipped = 0
+        for d in collect_drafts(shift, shift_date, entries):
+            if d["key"] not in picked or d["already"]:
+                continue
+            content = " ".join((request.form.get(f"content__{d['key']}") or d["content"]).split())[:2000]
+            note = " ".join((request.form.get(f"note__{d['key']}") or "").split())[:1000]
+            raw_time = request.form.get(f"time__{d['key']}")
+            entry_time = sj.normalize_time(raw_time) if raw_time else d["time"]
+            if not content or not entry_time:
+                skipped += 1
+                continue
+            cur = db.execute(
+                """
+                INSERT INTO journal_entries (shift_date, shift, entry_time, content, note, created_by_user_id, source_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (shift_date, shift, entry_time, content, note, current_user.id, d["key"]),
+            )
+            log_operation("create", "journal_entry", cur.lastrowid,
+                          f"Журнал смены {sj.title_for(shift, shift_date)}, {entry_time}: {content[:200]}")
+            added += 1
+        db.commit()
+        if skipped:
+            flash(f"Не добавлено строк: {skipped} — проверьте время (ЧЧ:ММ) и текст.", "error")
+        flash(f"Добавлено в журнал записей: {added}." if added else "Ничего не добавлено.", "success" if added else "info")
         return _back(shift, shift_date)
 
     def _entry_for_change(entry_id):

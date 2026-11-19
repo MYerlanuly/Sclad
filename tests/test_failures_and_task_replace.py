@@ -102,11 +102,38 @@ def test_complete_page_offers_replace_for_machine_task(admin, seed):
     assert "Нужна замена" not in admin.get(f"/shift_tasks/{plain}/complete").get_data(as_text=True)
 
 
-def test_maintenance_sees_no_replace_block(client_for, seed):
-    _install(seed["machine"], seed["sensor"], 3)
+def test_maintenance_replaces_from_task(client_for, seed):
+    """Инженер смены (maintenance) меняет датчик из задания; задание закрывается."""
+    link = _install(seed["machine"], seed["sensor"], 3)
     task = _task(seed["machine"], seed["sensor"])
-    html = client_for("maintenance").get(f"/shift_tasks/{task}/complete").get_data(as_text=True)
-    assert "Отметить задание выполненным" in html and "Нужна замена" not in html
+    c = client_for("maintenance")
+    html = c.get(f"/shift_tasks/{task}/complete").get_data(as_text=True)
+    assert "Нужна замена на борту INV-001?" in html
+    assert c.get(f"/machines/{seed['machine']}/replace_equipment/{link}?task={task}").status_code == 200
+    resp = c.post(
+        f"/machines/{seed['machine']}/replace_equipment/{link}?task={task}",
+        data={"equipment_id": seed["sensor2"], "reason": "faulty", "task": task},
+    )
+    assert resp.status_code == 302 and "/shift_tasks" in resp.headers["Location"]
+    assert db_scalar("SELECT removed_at FROM machine_equipment WHERE id = ?", (link,)) is not None
+    assert db_scalar("SELECT status FROM shift_tasks WHERE id = ?", (task,)) == "done"
+    assert db_scalar("SELECT username FROM operations_log WHERE operation_type = 'install' ORDER BY id DESC LIMIT 1") == "maintenance"
+
+
+def test_maintenance_cannot_replace_without_task(client_for, seed):
+    link = _install(seed["machine"], seed["sensor"], 3)
+    other_task = _task(seed["machine2"])          # задание по другому борту — не пропуск
+    c = client_for("maintenance")
+    for q in ("", f"?task={other_task}", "?task=99999"):
+        url = f"/machines/{seed['machine']}/replace_equipment/{link}{q}"
+        assert c.get(url).status_code == 302
+        c.post(url, data={"equipment_id": seed["sensor2"], "reason": "faulty", "task": q[6:] if q else ""})
+    assert db_scalar("SELECT removed_at FROM machine_equipment WHERE id = ?", (link,)) is None
+    # Обычное «снять» и установка для maintenance по-прежнему закрыты
+    c.post(f"/machines/{seed['machine']}/remove_equipment/{link}", data={"reason": "to_stock"})
+    assert db_scalar("SELECT removed_at FROM machine_equipment WHERE id = ?", (link,)) is None
+    html = c.get(f"/machines/{seed['machine']}").get_data(as_text=True)
+    assert "replace_equipment" not in html and "data-remove=" not in html
 
 
 def test_replace_from_task_completes_it(admin, seed):

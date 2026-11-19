@@ -123,8 +123,11 @@ def register(app):
                     "shift_task_carry",
                     "shift_task_edit",
                     "shift_task_delete",
+                    # Замена оборудования — только из задания на смену (проверяется в replace_equipment)
+                    "replace_equipment",
                     # Журнал смены
                     "journal_entry_add",
+                    "journal_drafts_add",
                     "journal_entry_edit",
                     "journal_entry_delete",
                     "journal_engineer_add",
