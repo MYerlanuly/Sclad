@@ -7,6 +7,7 @@ from flask import flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
 
 from ..db import fetch_all, fetch_one, get_db, ref_id
+from ..failures import DEFAULT_DAYS as FAILURE_DAYS, position_replacement_counts
 from ..removal import reason_text
 from ..utils import to_int
 
@@ -69,8 +70,10 @@ def _machine_card_context(machine_id):
     ]
     wheel_ids = {p["id"] for p in wheel_positions}
     by_position = {e["sensor_position_id"]: e for e in equipment if e["sensor_position_id"] in wheel_ids}
+    swaps = position_replacement_counts(machine_id)
     for p in wheel_positions:
         p["sensor"] = by_position.get(p["id"])
+        p["swaps"] = swaps.get(p["id"], 0)   # замен за 90 дней (только 2 и больше)
     other_equipment = [e for e in equipment if e["sensor_position_id"] not in wheel_ids]
 
     maintenance_total = fetch_one(
@@ -161,6 +164,7 @@ def _machine_card_context(machine_id):
         "active_sim": active_sim,
         "equipment": equipment,
         "wheel_positions": wheel_positions,
+        "failure_days": FAILURE_DAYS,
         "wheel_sensors_count": len(by_position),
         "other_equipment": other_equipment,
         "last_maintenance": last_maintenance,
