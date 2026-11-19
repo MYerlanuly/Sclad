@@ -3,11 +3,11 @@
 Имена маршрутов (endpoint) остались прежними, поэтому шаблоны и url_for не менялись.
 """
 from . import backup, dashboard, equipment, imports, installs, maintenance, machines, references, reports
-from . import journal, settings, shift_tasks, sim_cards, stock, users
+from . import failures, journal, settings, shift_tasks, sim_cards, stock, users
 
 MODULES = (
     dashboard, users, equipment, references, machines, installs, sim_cards, maintenance, shift_tasks,
-    journal, reports, imports, settings, backup, stock,
+    journal, reports, imports, settings, backup, stock, failures,
 )
 
 

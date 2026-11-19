@@ -7,6 +7,7 @@ from flask import flash, redirect, render_template, request, url_for
 from ..db import fetch_all, fetch_one, get_db, log_operation, ref_id
 from ..removal import EQUIPMENT_REMOVAL_REASONS, parse_removal, reason_text
 from ..utils import to_int
+from .shift_tasks import record_completion
 
 # id статусов из schema.sql: для сообщений после демонтажа
 EQUIPMENT_STATUS_NAMES = {1: "На складе", 2: "Установлено", 3: "Демонтировано", 4: "Неисправно", 5: "Списано"}
@@ -235,6 +236,11 @@ def register(app):
             return redirect(url_for("machine_detail", machine_id=machine_id))
 
         kind = old["equipment_kind"] or "other"
+        # ?task=<id> — замена из задания на смену: после замены задание отметится выполненным
+        task_id = to_int(request.values.get("task"))
+        task = fetch_one(
+            "SELECT id, status, title FROM shift_tasks WHERE id = ? AND status <> 'not_done'", (task_id,)
+        ) if task_id else None
         if request.method == "POST":
             new_id = to_int(request.form.get("equipment_id"))
             reason, comment, status_id = parse_removal(request.form, "equipment")
@@ -269,7 +275,7 @@ def register(app):
                 except sqlite3.IntegrityError:
                     db.rollback()
                     flash("Не удалось заменить: оборудование только что заняли. Попробуйте ещё раз.", "error")
-                    return redirect(url_for("replace_equipment", machine_id=machine_id, link_id=link_id))
+                    return redirect(url_for("replace_equipment", machine_id=machine_id, link_id=link_id, task=task_id or None))
                 inv = machine["inventory_number"]
                 where = f" на позиции {old['position_code']}" if old["position_code"] else ""
                 log_operation(
@@ -286,11 +292,17 @@ def register(app):
                     f"Замена: установка «{new['name']}» {new['serial_number']} на технику {inv}{where} "
                     f"вместо {old['serial_number']}",
                 )
-                flash(
+                done_text = (
                     f"Заменено: {old['serial_number']} → {new['serial_number']}. "
-                    f"Снятое получило статус «{EQUIPMENT_STATUS_NAMES.get(status_id, '')}».",
-                    "success",
+                    f"Снятое получило статус «{EQUIPMENT_STATUS_NAMES.get(status_id, '')}»."
                 )
+                if task:
+                    note = f"Замена{where}: {old['serial_number']} → {new['serial_number']}"
+                    why = reason_text("equipment", reason, comment)
+                    record_completion(task, f"{note} ({why})" if why else note)
+                    flash(done_text + f" Задание «{task['title']}» отмечено выполненным.", "success")
+                    return redirect(url_for("shift_tasks_list"))
+                flash(done_text, "success")
                 return redirect(url_for("machine_detail", machine_id=machine_id))
 
         # Свободное оборудование того же вида; то же наименование — первым
@@ -328,6 +340,7 @@ def register(app):
             selected_reason=request.form.get("reason") or "faulty",
             selected_id=to_int(request.form.get("equipment_id")),
             comment=request.form.get("comment") or "",
+            task=task,
         )
 
     # --- SIM installation on machine ---

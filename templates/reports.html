@@ -207,6 +207,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 no-print">
             <button type="button" class="ghost" onclick="window.print()">{{ icon('print') }}Печать / PDF</button>
+            <a class="ghost" href="{{ url_for('failures_report') }}">{{ icon('alert') }}Повторные отказы</a>
             <a class="ghost" href="{{ url_for('export_inventory_excel') }}">{{ icon('download') }}Excel</a>
         </div>
     </div>

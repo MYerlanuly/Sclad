@@ -10,6 +10,17 @@
         </div>
     </div>
     <p class="text-slate-600 text-sm mb-4">Задание: <strong>{{ task.title }}</strong></p>
+    {% if installed %}
+    <div class="mb-5 p-3 rounded-lg border border-blue-200 bg-blue-50">
+        <div class="text-sm font-medium text-slate-800 mb-1">Нужна замена на борту {{ task.inventory_number }}?</div>
+        <div class="text-xs text-slate-600 mb-2">Выберите, что меняете. После замены задание отметится выполненным само, в комментарий запишется, что на что заменили.</div>
+        <div class="flex flex-wrap gap-2">
+            {% for e in installed %}
+            <a href="{{ url_for('replace_equipment', machine_id=task.machine_id, link_id=e.link_id, task=task.id) }}" class="btn {{ 'btn-primary' if e.equipment_id == task.equipment_id else 'btn-secondary' }}" style="font-size: 0.8125rem;">Заменить {% if e.position_code %}{{ e.position_code }} · {% endif %}{{ e.serial_number }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
     <form method="post" action="{{ url_for('shift_task_complete', task_id=task.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">

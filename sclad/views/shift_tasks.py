@@ -26,6 +26,41 @@ def _period_presets(today):
 OPEN_PAST_LIMIT = 50
 
 
+def record_completion(task, comment):
+    """Отметить текущего пользователя исполнителем задания (и закрыть задание, если ещё не закрыто).
+
+    task — строка с id, status, title. False, если пользователь уже отмечен.
+    """
+    task_id = task["id"]
+    now = datetime.now().isoformat(sep=" ", timespec="seconds")
+    db = get_db()
+    already = db.execute(
+        "SELECT 1 FROM shift_task_completions WHERE shift_task_id = ? AND user_id = ?",
+        (task_id, current_user.id),
+    ).fetchone()
+    if already:
+        return False
+    db.execute(
+        "INSERT INTO shift_task_completions (shift_task_id, user_id, completed_at, comment) VALUES (?, ?, ?, ?)",
+        (task_id, current_user.id, now, comment),
+    )
+    if task["status"] != "done":
+        first = db.execute(
+            "SELECT user_id, completed_at FROM shift_task_completions WHERE shift_task_id = ? ORDER BY completed_at LIMIT 1",
+            (task_id,),
+        ).fetchone()
+        db.execute(
+            "UPDATE shift_tasks SET status = 'done', completed_at = ?, completed_by_user_id = ? WHERE id = ?",
+            (first[1], first[0], task_id),
+        )
+    db.commit()
+    desc = f"Отмечено выполненным задание #{task_id}: «{(task['title'] or '')[:50]}»"
+    if comment:
+        desc += f". Что сделано: {comment[:100]}"
+    log_operation("complete", "shift_task", task_id, desc)
+    return True
+
+
 def register(app):
     @app.route("/shift_task_types")
     def shift_task_types_list():
@@ -564,7 +599,11 @@ def register(app):
             flash("Недостаточно прав.", "error")
             return redirect(url_for("shift_tasks_list"))
         task = fetch_one(
-            "SELECT id, status, title FROM shift_tasks WHERE id = ?",
+            """
+            SELECT st.id, st.status, st.title, st.machine_id, st.equipment_id, m.inventory_number
+            FROM shift_tasks st LEFT JOIN machines m ON st.machine_id = m.id
+            WHERE st.id = ?
+            """,
             (task_id,),
         )
         if task is None:
@@ -574,38 +613,32 @@ def register(app):
             flash("Задание отмечено как не выполненное. Перенесите его на другую смену.", "error")
             return redirect(url_for("shift_tasks_list"))
         if request.method == "GET":
+            # Задание по борту: редактор может сразу провести замену, задание закроется само
+            installed = []
+            if task["machine_id"] and current_user.can_edit:
+                installed = [
+                    dict(r)
+                    for r in fetch_all(
+                        """
+                        SELECT me.id AS link_id, e.id AS equipment_id, e.name, e.serial_number, sp.code AS position_code
+                        FROM machine_equipment me
+                        JOIN equipment e ON me.equipment_id = e.id
+                        LEFT JOIN sensor_positions sp ON me.sensor_position_id = sp.id
+                        WHERE me.machine_id = ? AND me.removed_at IS NULL
+                        ORDER BY CASE WHEN e.id = ? THEN 0 ELSE 1 END, COALESCE(sp.sort_order, 99), sp.id, e.name
+                        """,
+                        (task["machine_id"], task["equipment_id"] or 0),
+                    )
+                ]
             return render_template(
                 "shift_task_complete.html",
                 task=dict(task),
+                installed=installed,
             )
-        now = datetime.now().isoformat(sep=" ", timespec="seconds")
         comment = (request.form.get("comment") or "").strip() or None
-        db = get_db()
-        already = db.execute(
-            "SELECT 1 FROM shift_task_completions WHERE shift_task_id = ? AND user_id = ?",
-            (task_id, current_user.id),
-        ).fetchone()
-        if already:
+        if not record_completion(task, comment):
             flash("Вы уже отметили это задание выполненным.", "info")
             return redirect(url_for("shift_tasks_list"))
-        db.execute(
-            "INSERT INTO shift_task_completions (shift_task_id, user_id, completed_at, comment) VALUES (?, ?, ?, ?)",
-            (task_id, current_user.id, now, comment),
-        )
-        if task["status"] != "done":
-            first = db.execute(
-                "SELECT user_id, completed_at FROM shift_task_completions WHERE shift_task_id = ? ORDER BY completed_at LIMIT 1",
-                (task_id,),
-            ).fetchone()
-            db.execute(
-                "UPDATE shift_tasks SET status = 'done', completed_at = ?, completed_by_user_id = ? WHERE id = ?",
-                (first[1], first[0], task_id),
-            )
-        db.commit()
-        desc = f"Отмечено выполненным задание #{task_id}: «{(task['title'] or '')[:50]}»"
-        if comment:
-            desc += f". Что сделано: {comment[:100]}"
-        log_operation("complete", "shift_task", task_id, desc)
         flash("Вы отмечены как исполнитель задания.", "success")
         return redirect(url_for("shift_tasks_list"))
 

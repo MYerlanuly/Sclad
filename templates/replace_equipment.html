@@ -24,6 +24,7 @@
         <a href="{{ url_for('machine_detail', machine_id=machine.id) }}" class="btn btn-secondary">← Назад к технике</a>
     </div>
 
+    {% if task %}<p class="mb-3 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">По заданию на смену «{{ task.title }}»: после замены оно отметится выполненным.</p>{% endif %}
     <div class="rp-old">
         <span>Снимаем:</span>
         <b>{{ old.name }} {{ old.serial_number }}</b>
@@ -36,12 +37,14 @@
         <div class="flex flex-wrap gap-2 items-center">
             <input type="text" id="rp-search" name="q" class="max-w-md w-full" placeholder="Название или серийный номер" value="{{ request.args.get('q', '') }}">
             <button type="submit" class="btn btn-secondary">Найти</button>
-            {% if request.args.get('q') %}<a href="{{ url_for('replace_equipment', machine_id=machine.id, link_id=old.id) }}" class="btn btn-secondary">Сбросить</a>{% endif %}
+            {% if task %}<input type="hidden" name="task" value="{{ task.id }}">{% endif %}
+            {% if request.args.get('q') %}<a href="{{ url_for('replace_equipment', machine_id=machine.id, link_id=old.id, task=task.id if task else None) }}" class="btn btn-secondary">Сбросить</a>{% endif %}
         </div>
     </form>
 
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if task %}<input type="hidden" name="task" value="{{ task.id }}">{% endif %}
         <div class="rp-grid">
             <div class="field">
                 <label for="rp-reason">Почему снимаем</label>

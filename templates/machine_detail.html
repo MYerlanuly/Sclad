@@ -9,6 +9,7 @@
 <div class="wheel {{ 'wheel-on' if s else 'wheel-off' }}">
     <span class="wheel-code">{{ p.code }}</span>
     <span class="wheel-pos" title="{{ p.label or p.code }}">{{ p.label or p.code }}</span>
+    {% if p.swaps %}<a href="{{ url_for('failures_report', days=failure_days) }}" class="wheel-swaps" title="За {{ failure_days }} дней с этой позиции сняли датчиков: {{ p.swaps }}. Проверьте проводку и крепление">{{ icon('alert', 'w-3 h-3') }} {{ p.swaps }} {{ 'замены' if p.swaps % 10 in (2, 3, 4) and p.swaps % 100 not in (12, 13, 14) else 'замен' }} за {{ failure_days }} дн.</a>{% endif %}
     {% if s %}
     <span class="wheel-val"><a href="{{ url_for('equipment_detail', equipment_id=s.id) }}" class="lnk tnum" title="{{ s.name }}, установлен {{ s.installed_at | datefmt }}">{{ s.serial_number }}</a></span>
     {% if can_edit %}<span class="row-acts">{{ replace_link(machine.id, s.link_id, 'датчик ' ~ s.serial_number) }}{{ remove_btn(url_for('remove_equipment', machine_id=machine.id, link_id=s.link_id), 'датчик ' ~ s.serial_number ~ ' с позиции ' ~ p.code) }}</span>{% endif %}

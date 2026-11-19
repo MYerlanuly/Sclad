@@ -217,6 +217,19 @@
     .user-dropdown a:hover { background: #f3f4f6; color: #111827; }
     .user-dropdown hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.35rem 0; }
     .header-recent { position: relative; margin-left: 0; }
+    /* Телефон: шапка в три строки (логотип и пользователь / поиск / разделы), без выхода за ширину экрана */
+    @media (max-width: 767px) {
+        .header-inner { flex-wrap: wrap; gap: 0.375rem 0.5rem; }
+        .header-inner > h1 { order: 1; }
+        .header-inner .user-menu { order: 2; }
+        .header-inner .user-menu summary { max-width: 11rem; }
+        .header-inner .user-menu summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .header-inner form[role="search"] { order: 3; flex: 1 1 calc(100% - 7rem); min-width: 0; }
+        .header-inner .header-search { width: 100%; box-sizing: border-box; }
+        .header-inner .header-recent { order: 4; }
+        .header-inner nav { order: 5; width: 100%; flex-wrap: wrap; gap: 0.125rem; margin: 0 -0.5rem; }
+        .header-inner nav .nav-dropdown { left: 0; right: auto; }
+    }
     .header-recent summary { list-style: none; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem; color: rgba(255,255,255,0.85); }
     .header-recent summary::-webkit-details-marker { display: none; }
     .header-recent summary:hover { color: #fff; background: rgba(255,255,255,0.1); }

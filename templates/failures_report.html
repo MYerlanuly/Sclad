@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Повторные отказы{% endblock %}
+{% block breadcrumbs %}{{ breadcrumb([(url_for('index'), 'Главная'), (url_for('reports'), 'Отчёты'), (none, 'Повторные отказы')]) }}{% endblock %}
+{% block content %}
+{% set period_names = {30: '30 дней', 90: '90 дней', 180: 'Полгода', 365: 'Год'} %}
+<style>
+    .fr-seg { display: inline-flex; gap: 4px; padding: 3px; border-radius: 0.5rem; background: #f1f5f9; }
+    .fr-seg a { padding: 0.3rem 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; color: #475569; text-decoration: none; }
+    .fr-seg a.on { background: #fff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+    .fr-sec { margin-top: 1.25rem; }
+    .fr-sec h3 { font-size: 1rem; font-weight: 600; color: #0f172a; margin: 0 0 0.25rem; }
+    .fr-lead { font-size: 0.8125rem; color: #64748b; margin: 0 0 0.625rem; }
+    .fr-scroll { overflow-x: auto; }
+    .fr-table td.num, .fr-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .fr-bad { color: #b91c1c; font-weight: 700; }
+    .fr-notes { margin: 0; padding: 0; list-style: none; font-size: 0.8125rem; color: #475569; }
+    .fr-notes li { white-space: nowrap; }
+    .fr-notes .r { color: #64748b; white-space: normal; }
+    .fr-empty { padding: 0.875rem 1rem; border: 1px dashed #cbd5e1; border-radius: 0.5rem; font-size: 0.875rem; color: #64748b; background: #f8fafc; }
+</style>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Повторные отказы</div>
+        <nav class="fr-seg" aria-label="Период">
+            {% for p in periods %}<a href="{{ url_for('failures_report', days=p) }}" class="{{ 'on' if p == days }}">{{ period_names[p] }}</a>{% endfor %}
+        </nav>
+    </div>
+    <p class="muted">Если на одной позиции датчик меняют снова и снова, причина обычно в самой позиции: проводка, антенна, крепление, а не в датчике. Отказ — снятие с причиной «Неисправен» или «Повреждён». Возврат исправного на склад и вывод борта из работы заменой не считаются.</p>
+
+    <section class="fr-sec">
+        <h3>Позиции с частыми заменами</h3>
+        <p class="fr-lead">За {{ period_names[days]|lower }} с позиции сняли {{ min_repeats }} датчика и больше.</p>
+        {% if positions %}
+        <div class="fr-scroll"><table class="fr-table">
+            <thead><tr><th>Борт</th><th>Позиция</th><th class="num">Замен</th><th class="num">Из них отказов</th><th>Что снимали</th></tr></thead>
+            <tbody>
+            {% for p in positions %}
+            <tr>
+                <td><a href="{{ url_for('machine_detail', machine_id=p.machine_id) }}">{{ p.inventory_number }}</a></td>
+                <td title="{{ p.position_label or '' }}">{{ p.position_code }}</td>
+                <td class="num fr-bad">{{ p.replacements }}</td>
+                <td class="num">{{ p.faults }}</td>
+                <td><ul class="fr-notes">{% for n in p.notes %}<li>{{ n.at | datefmt }} · <a href="{{ url_for('equipment_detail', equipment_id=n.equipment_id) }}">{{ n.serial }}</a>{% if n.reason %} · <span class="r">{{ n.reason }}</span>{% endif %}</li>{% endfor %}</ul></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}<div class="fr-empty">Таких позиций нет.</div>{% endif %}
+    </section>
+
+    <section class="fr-sec">
+        <h3>Оборудование, которое снимали неисправным не раз</h3>
+        <p class="fr-lead">После ремонта отказало снова: кандидаты на списание или возврат по гарантии.</p>
+        {% if equipment %}
+        <div class="fr-scroll"><table class="fr-table">
+            <thead><tr><th>Наименование</th><th>S/N</th><th class="num">Отказов</th><th>На бортах</th><th>Статус сейчас</th><th class="num">Последний</th></tr></thead>
+            <tbody>
+            {% for e in equipment %}
+            <tr>
+                <td>{{ e.name }}</td>
+                <td><a href="{{ url_for('equipment_detail', equipment_id=e.id) }}">{{ e.serial_number }}</a></td>
+                <td class="num fr-bad">{{ e.faults }}</td>
+                <td>{{ (e.boards or '').replace(',', ', ') }}</td>
+                <td>{{ e.status_name }}</td>
+                <td class="num">{{ e.last_at | datefmt }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}<div class="fr-empty">Такого оборудования нет.</div>{% endif %}
+    </section>
+
+    <section class="fr-sec">
+        <h3>Борта с наибольшим числом отказов</h3>
+        <p class="fr-lead">Отказы оборудования на борту за {{ period_names[days]|lower }}.</p>
+        {% if machines %}
+        <div class="fr-scroll"><table class="fr-table">
+            <thead><tr><th>Борт</th><th>Модель</th><th class="num">Отказов</th><th class="num">Разных позиций</th><th class="num">Последний</th></tr></thead>
+            <tbody>
+            {% for m in machines %}
+            <tr>
+                <td><a href="{{ url_for('machine_detail', machine_id=m.id) }}">{{ m.inventory_number }}</a></td>
+                <td>{{ m.model_name or '' }}</td>
+                <td class="num fr-bad">{{ m.faults }}</td>
+                <td class="num">{{ m.positions }}</td>
+                <td class="num">{{ m.last_at | datefmt }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}<div class="fr-empty">Отказов за период не было.</div>{% endif %}
+    </section>
+</div>
+{% endblock %}
