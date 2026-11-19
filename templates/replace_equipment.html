@@ -47,7 +47,7 @@
                 <label for="rp-reason">Почему снимаем</label>
                 <select id="rp-reason" name="reason">
                     {% for code, label, status_id in reasons %}
-                    <option value="{{ code }}" data-status="{{ {3: 'Демонтировано', 4: 'Неисправно'}.get(status_id, '') }}" {% if code == selected_reason %}selected{% endif %}>{{ label }}</option>
+                    <option value="{{ code }}" data-status="{{ {1: 'На складе', 3: 'Демонтировано', 4: 'Неисправно'}.get(status_id, '') }}" {% if code == selected_reason %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>

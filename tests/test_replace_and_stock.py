@@ -211,3 +211,24 @@ def test_stock_minimums_roles(client_for, seed):
 def test_written_off_not_counted(admin, seed):
     db_exec("INSERT INTO equipment (name, serial_number, status_id, equipment_kind) VALUES ('Старый блок', 'OLD-1', 5, 'other')")
     assert "Старый блок" not in admin.get("/stock").get_data(as_text=True)
+
+
+def test_remove_healthy_back_to_stock_can_install_again(admin, seed):
+    link = _install_eq(seed["machine"], seed["sensor"], position=1)
+    admin.post(f"/machines/{seed['machine']}/remove_equipment/{link}", data={"reason": "to_stock"})
+    assert db_scalar("SELECT status_id FROM equipment WHERE id = ?", (seed["sensor"],)) == 1  # На складе
+    # Сразу виден в списке для установки и ставится на другой борт
+    page = admin.get(f"/machines/{seed['machine2']}/install_equipment").get_data(as_text=True)
+    assert "DS-1" in page
+    admin.post(f"/machines/{seed['machine2']}/install_equipment", data={"equipment_id": seed["sensor"], "sensor_position_id": "2"})
+    assert db_scalar("SELECT status_id FROM equipment WHERE id = ?", (seed["sensor"],)) == 2
+    sim_link = _install_sim(seed["machine"], seed["sim"])
+    admin.post(f"/machines/{seed['machine']}/remove_sim/{sim_link}", data={"reason": "to_stock"})
+    assert db_scalar("SELECT status_id FROM sim_cards WHERE id = ?", (seed["sim"],)) == 1
+
+
+def test_remove_dialog_default_is_back_to_stock(admin, seed):
+    _install_eq(seed["machine"], seed["sensor"], position=1)
+    html = admin.get(f"/machines/{seed['machine']}").get_data(as_text=True)
+    first = html.index('id="rm-reason-equipment"')
+    assert html.index('value="to_stock" data-status="На складе"', first) < html.index('value="faulty"', first)
