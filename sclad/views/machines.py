@@ -369,7 +369,7 @@ def register(app):
     def machine_detail(machine_id):
         machine = fetch_one(
             """
-            SELECT m.*, mm.name AS model_name, mt.name AS type_name
+            SELECT m.*, mm.name AS model_name, mt.name AS type_name, mm.art_kind
             FROM machines m
             JOIN machine_models mm ON m.machine_model_id = mm.id
             JOIN machine_types mt ON mm.machine_type_id = mt.id

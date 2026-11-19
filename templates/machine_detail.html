@@ -30,7 +30,7 @@
 
 <div class="mc">
 {# ---------- Шапка ---------- #}
-{% set art_kind = machine.type_name | machine_kind(machine.model_name) %}
+{% set art_kind = machine.type_name | machine_kind(machine.model_name, machine.art_kind) %}
 <section class="mb-5 flex flex-wrap items-start justify-between gap-3">
     <div class="hero min-w-0">
         <div class="hero-art" title="{{ machine.type_name }} · {{ machine.model_name }}">{{ machine_art(art_kind, title=machine.type_name ~ ' ' ~ machine.model_name) }}</div>
@@ -65,6 +65,7 @@
             <summary class="act act-icon" title="Ещё" aria-label="Ещё">{{ icon('dots') }}</summary>
             <div class="act-menu-list">
                 {% if can_edit %}<a href="{{ url_for('machine_edit', machine_id=machine.id) }}">{{ icon('edit') }} Изменить данные</a>{% endif %}
+                {% if can_edit %}<a href="{{ url_for('machine_model_edit', model_id=machine.machine_model_id) }}" title="Рисунок общий для всех бортов модели {{ machine.model_name }}">{{ icon('edit') }} Сменить рисунок</a>{% endif %}
                 <button type="button" onclick="window.print();">{{ icon('printer') }} Печать карточки</button>
             </div>
         </details>

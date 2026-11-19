@@ -11,7 +11,7 @@ import re
 KINDS = (
     ("locomotive", "Локомотив", ("локомотив", "тепловоз", "электровоз", "тяговый агрегат", "тэм", "тгм", "2тэ", "нп-1", "locomotive")),
     ("dragline", "Шагающий экскаватор", ("шагающ", "драглайн", "эш", "dragline")),
-    ("bucket_wheel", "Роторный экскаватор", ("роторн", "эрп", "эр-", "bucket wheel")),
+    ("bucket_wheel", "Роторный экскаватор", ("роторн", "эрп", "эр-", "срс", "шрс", "srs", "schrs", "bucket wheel")),
     ("rope_shovel", "Экскаватор ЭКГ", ("экг", "мехлопат", "канатн", "shovel")),
     ("bus", "Автобус", ("автобус", "паз", "вахтов", "bus")),
     ("jeep", "Внедорожник", ("патриот", "хантер", "469", "3151", "внедорож", "джип", "jeep", "patriot", "hunter")),
@@ -37,8 +37,26 @@ def _pattern(word):
 _RULES = tuple((kind, re.compile("|".join(_pattern(w) for w in words))) for kind, _label, words in KINDS)
 
 
-def machine_kind(type_name, model_name=None):
-    """Вид техники для рисунка по типу и модели вместе: «Экскаватор» + «ЭКГ-10» → ЭКГ."""
+# Порядок рисунков в выборе (справочник моделей)
+ART_CHOICES = tuple((k, KIND_LABELS[k]) for k in (
+    "dump_truck", "rope_shovel", "excavator", "dragline", "bucket_wheel", "dozer", "loader", "drill", "grader",
+    "tanker", "locomotive", "bus", "uaz", "jeep", "pickup", OTHER,
+))
+
+
+def clean_art_kind(value):
+    """Выбор рисунка из формы: известный вид или None (подбирать по названию)."""
+    value = (value or "").strip()
+    return value if value in KIND_LABELS else None
+
+
+def machine_kind(type_name, model_name=None, chosen=None):
+    """Вид техники для рисунка. chosen — выбран вручную в справочнике моделей.
+
+    Иначе по типу и модели вместе: «Экскаватор» + «ЭКГ-10» → ЭКГ.
+    """
+    if chosen in KIND_LABELS:
+        return chosen
     text = f"{type_name or ''} {model_name or ''}".lower().strip()
     if text:
         for kind, rx in _RULES:

@@ -865,6 +865,25 @@ def migrate_journal_entries_source_key():
         conn.close()
 
 
+def migrate_machine_models_art_kind():
+    """Рисунок модели, выбранный вручную (machine_art.KINDS); пусто — подбирается по названию."""
+    if not os.path.exists(DATABASE):
+        return False
+    conn = sqlite3.connect(DATABASE)
+    try:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(machine_models)").fetchall()]
+        if cols and "art_kind" not in cols:
+            try:
+                conn.execute("ALTER TABLE machine_models ADD COLUMN art_kind TEXT")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 MIGRATIONS = (
     migrate_equipment_unique_constraint,
     migrate_sensor_positions_group,
@@ -890,6 +909,7 @@ MIGRATIONS = (
     migrate_shift_tasks_carry_over,
     migrate_removal_reasons_and_stock_minimums,
     migrate_journal_entries_source_key,
+    migrate_machine_models_art_kind,
 )
 
 
